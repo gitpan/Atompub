@@ -1,0 +1,19 @@
+Build.PL
+Changes
+MANIFEST
+META.yml # Will be created by "make dist"
+Makefile.PL
+README
+lib/Atompub.pm
+lib/Atompub/Client.pm
+lib/Atompub/Server.pm
+t/00.load.t
+t/01.client.t
+t/lib/My/Server.pm
+t/perlcritic.t
+t/pod-coverage.t
+t/pod.t
+t/samples/media1.gif
+t/samples/media2.png
+t/server.cgi
+

@@ -1,0 +1,32 @@
+---
+name: Atompub
+version: 0.0.1
+author:
+  - 'Takeru INOUE <takeru.inoue _ gmail.com>'
+abstract: Atom Publishing Protocol implementation
+license: perl
+resources:
+  license: http://dev.perl.org/licenses/
+requires:
+  DateTime: 0
+  Digest::SHA1: 0
+  File::Slurp: 0
+  HTTP::Status: 0
+  MIME::Base64: 0
+  Test::More: 0
+  URI::Escape: 0
+  XML::Atom: 0.25
+  XML::Atom::Service: 0.13.4
+  version: 0
+provides:
+  Atompub:
+    file: lib/Atompub.pm
+    version: 0.0.1
+  Atompub::Client:
+    file: lib/Atompub/Client.pm
+  Atompub::Server:
+    file: lib/Atompub/Server.pm
+generated_by: Module::Build version 0.2808
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.2.html
+  version: 1.2
