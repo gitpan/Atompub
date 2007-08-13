@@ -1,3 +1,8 @@
+2007-08-13  Takeru INOUE  <takeru.inoue _ gmail.com>
+
+        * release 0.0.2:
+        * add Test::Perl::Critic to requires in Build.PL
+
 2007-08-12  Takeru INOUE  <takeru.inoue _ gmail.com>
 
         * release 0.0.1: created by Module::Starter
