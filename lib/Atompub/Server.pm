@@ -2,10 +2,13 @@ package Atompub::Server;
 
 use strict;
 use warnings;
-use MIME::Base64 qw( encode_base64 decode_base64 );
+
+use Atompub;
 use Digest::SHA1 qw( sha1 );
+use MIME::Base64 qw( encode_base64 decode_base64 );
 use HTTP::Status;
 use XML::Atom;
+
 use base qw( XML::Atom::Server );
 
 sub send_http_header {
@@ -102,6 +105,7 @@ __END__
 
 Atompub::Server - A server for the Atom Publishing Protocol
 
+
 =head1 SYNOPSIS
 
     package My::Server;
@@ -137,30 +141,26 @@ Atompub::Server - A server for the Atom Publishing Protocol
 
 =head1 DESCRIPTION
 
-B<Atompub::Server> provides a base class for Atom Publishing Protocol servers.
+L<Atompub::Server> provides a base class for Atom Publishing Protocol servers.
 It handles all core server processing, and Basic and WSSE authentication.
 It can also run as either a mod_perl handler or as part of a CGI program.
 
 It does not provide functions specific to any particular implementation,
 such as creating an entry, retrieving a list of entries, deleting an entry, etc.
-Implementations should subclass B<Atompub::Server>, overriding the
+Implementations should subclass L<Atompub::Server>, overriding the
 C<handle_request> method, and handle all functions such as this themselves.
 
-B<Atompub::Server> extends B<Atom::XML::Server>, and basically provides same functions.
+L<Atompub::Server> extends L<Atom::XML::Server>, and basically provides same functions.
 However, this module has been fixed based on the Atom Publishing Protocol
 described at L<http://www.ietf.org/internet-drafts/draft-ietf-atompub-protocol-17.txt>,
 and supports Basic authentication rather than WSSE.
-
-This module was tested in InteropTokyo2007
-L<http://intertwingly.net/wiki/pie/July2007InteropTokyo>,
-and interoperated with other implementations.
 
 
 =head1 SUBCLASSING
 
 =head2 Request Handling
 
-Subclasses of B<Atompub::Server> must override the C<handle_request>
+Subclasses of L<Atompub::Server> must override the C<handle_request>
 method to perform all request processing.
 The implementation must set all response headers, including the response
 code and any relevant HTTP headers, and should return a scalar representing 
@@ -238,7 +238,7 @@ with the digest sent in the WSSE header.
 
 =head1 METHODS
 
-B<Atompub::Server> provides a variety of methods to be used by subclasses
+L<Atompub::Server> provides a variety of methods to be used by subclasses
 for retrieving headers, content, and other request information, and for
 setting the same on the response.
 
@@ -267,6 +267,14 @@ Once you have defined your server subclass, you can set it up either as a
 CGI program or as a mod_perl handler.
 
 See L<XML::Atom::Server> in details.
+
+
+=head1 SEE ALSO
+
+L<XML::Atom>
+L<XML::Atom::Service>
+L<Atompub>
+L<Catalyst::Controller::Atompub>
 
 
 =head1 AUTHOR

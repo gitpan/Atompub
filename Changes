@@ -1,8 +1,21 @@
+2007-09-10  Takeru INOUE  <takeru.inoue _ gmail.com>
+
+	* release 0.1.0:
+	* Atompub.pm
+	- add some methods to HTTP::Headers, HTTP::Request, and HTTP::Response
+	* Atompub/Client.pm
+	- merge operations for entry and media resources internally
+	- support cache mechanizem using Last-Modified header
+	- refactoring drastically
+	* Atompub/DateTime.pm, Atompub/MediaType.pm, Atompub/Util.pm
+	- newly added
+
 2007-08-13  Takeru INOUE  <takeru.inoue _ gmail.com>
 
-        * release 0.0.2:
-        * add Test::Perl::Critic to requires in Build.PL
+	* release 0.0.2:
+	* Build.PL
+	- add Test::Perl::Critic to requires
 
 2007-08-12  Takeru INOUE  <takeru.inoue _ gmail.com>
 
-        * release 0.0.1: created by Module::Starter
+	* release 0.0.1: created by Module::Starter

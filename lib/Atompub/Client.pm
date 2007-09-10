@@ -2,71 +2,42 @@ package Atompub::Client;
 
 use warnings;
 use strict;
-use URI::Escape;
-use HTTP::Status;
-use DateTime;
+
+use Atompub;
+use Atompub::DateTime qw( datetime );
+use Atompub::MediaType qw( media_type );
+use Atompub::Util qw( is_acceptable_media_type is_allowed_category );
 use Digest::SHA1 qw( sha1 );
-use MIME::Base64 qw( encode_base64 );
 use File::Slurp;
+use HTTP::Status;
+use MIME::Base64 qw( encode_base64 );
+use NEXT;
+use URI::Escape;
 use XML::Atom::Entry;
 use XML::Atom::Service;
-use Atompub;
-use base qw( XML::Atom::Client );
 
-my $ENTRY_TYPE = 'application/atom+xml;type=entry';
+use base qw( XML::Atom::Client Class::Accessor::Lvalue::Fast );
+
+my @ATTRS = qw( request response resource );
+
+__PACKAGE__->mk_accessors( @ATTRS, qw( ua info cache ) );
+
+*req = \&request;
+*res = \&response;
+*rc  = \&resource;
 
 sub init {
     my $client = shift;
-    $client->SUPER::init(@_);
-    $client->{ua}->agent( 'Atompub::Client/' . Atompub->VERSION );
+    $client->NEXT::init(@_);
+    $client->ua->agent( 'Atompub::Client/' . Atompub->VERSION );
+    $client->info  = Atompub::Client::Info->instance;
+    $client->cache = Atompub::Client::Cache->instance;
     $client;
 }
 
 sub proxy {
     my $client = shift;
-    $client->{ua}->proxy( [ 'http', 'https' ], shift );
-}
-
-sub slug {
-    my $client = shift;
-    if ( @_ ) {
-	$client->{ua}->default_header( Slug => uri_escape $_[0] );
-    }
-    else {
-	uri_unescape $client->{ua}->default_header('Slug');
-    }
-}
-
-## Cache the collection information described in the Service Docment
-sub _info {
-    my $client = shift;
-    my ( $coll ) = @_;
-
-    my $href = $coll->href;
-
-    my $info = {
-	title     => $coll->title,
-	href      => $href,
-	accept    => [ map { split /[\s,]+/ } $coll->accept ],
-    };
-
-    my @cats;
-    for my $cats ( $coll->categories ) {
-	$cats = $client->getCategories( $cats->href ) if $cats->href;
-
-	my @cat = map { term => $_->term, scheme => $_->scheme },
-	              $cats->category;
-
-	push @cats, {
-	    fixed    => ( $cats->fixed || 'no' ),
-	    scheme   => $cats->scheme,
-	    category => \@cat,
-	};
-    }
-
-    $info->{categories} = \@cats;
-
-    return ( $href, $info );
+    $client->ua->proxy( [ 'http', 'https' ], $_[0] );
 }
 
 sub getService {
@@ -75,43 +46,20 @@ sub getService {
 
     return $client->error('No URI') unless $uri;
 
-    my $req = HTTP::Request->new( GET => $uri );
+    $client->_get_service( uri => $uri ) || return;
 
-    my $res = $client->make_request( $req );
-
-    return $client->error( $res->status_line . "\n" . $res->content )
-	unless is_success $res->code;
-    
-    my $serv = XML::Atom::Service->new( \$res->content )
-	|| return $client->errorr( XML::Atom::Service->errstr );
-
-    for my $work ( $serv->workspace ) {
-	for my $coll ( $work->collection ) {
-	    my ( $href, $info ) = $client->_info($coll);
-	    $client->{info}{$href} = $info;
-	}
-    }
-
-    return $serv;
+    return $client->rc;
 }
 
 sub getCategories {
     my $client = shift;
-    my( $uri ) = @_;
+    my ( $uri ) = @_;
 
     return $client->error('No URI') unless $uri;
 
-    my $req = HTTP::Request->new(GET => $uri);
+    $client->_get_categories( uri => $uri ) || return;
 
-    my $res = $client->make_request( $req );
-
-    return $client->error( $res->status_line . "\n" . $res->content )
-	unless is_success $res->code;
-
-    my $cats = XML::Atom::Categories->new( \$res->content )
-	|| return $client->error( XML::Atom::Categories->errstr );
-
-    return $cats;
+    return $client->rc;
 }
 
 sub getFeed {
@@ -120,17 +68,56 @@ sub getFeed {
 
     return $client->error('No URI') unless $uri;
 
-    my $req = HTTP::Request->new( GET => $uri );
+    $client->_get_feed( uri => $uri ) || return;
 
-    my $res = $client->make_request( $req );
+    return $client->rc;
+}
 
-    return $client->error( $res->status_line . "\n" . $res->content )
-	unless is_success( $res->code );
+sub createEntry {
+    my $client = shift;
+    my ( $uri, $entry, $slug ) = @_;
 
-    my $feed = XML::Atom::Feed->new( \$res->content )
-	|| return $client->error( XML::Atom::Feed->errstr );
+    return $client->error('No URI')   unless $uri;
+    return $client->error('No Entry') unless $entry;
 
-    return $feed;
+    if ( ! UNIVERSAL::isa( $entry, 'XML::Atom::Entry' ) ) {
+	$entry = XML::Atom::Entry->new($entry)
+	    || return $client->error( XML::Atom::Entry->errstr );
+    }
+
+    my $headers = HTTP::Headers->new;
+    $headers->content_type( media_type('entry') );
+    $headers->slug( uri_escape uri_unescape $slug ) if defined $slug;
+
+    $client->_create_resource( uri     => $uri,
+			       rc      => $entry,
+			       headers => $headers ) || return;
+
+    return $client->res->location;
+}
+
+sub createMedia {
+    my $client = shift;
+    my ( $uri, $stream, $content_type, $slug ) = @_;
+
+    return $client->error('No URI')          unless $uri;
+    return $client->error('No stream')       unless $stream;
+    return $client->error('No Content-Type') unless $content_type;
+
+    my $media
+	= ref $stream ? $$stream
+	:               read_file( $stream, binmode => ':raw', err_mode => 'carp' )
+	    || return $client->error('No media');
+
+    my $headers = HTTP::Headers->new;
+    $headers->content_type( $content_type );
+    $headers->slug( uri_escape uri_unescape $slug ) if defined $slug;
+
+    $client->_create_resource( uri     => $uri, 
+			       rc      => \$media, 
+			       headers => $headers ) || return;
+
+    return $client->res->location;
 }
 
 sub getEntry {
@@ -139,29 +126,12 @@ sub getEntry {
 
     return $client->error('No URI') unless $uri;
 
-    my $req = HTTP::Request->new( GET => $uri );
-    my $etag = $client->{cache}{$uri}{etag};
-    $req->header( 'If-None-Match' => $etag ) if $etag;
+    $client->_get_resource( uri => $uri ) || return;
 
-    my $res = $client->make_request( $req );
+    return $client->error('Response is not Atom Entry')
+	unless UNIVERSAL::isa( $client->rc, 'XML::Atom::Entry' );
 
-    my $entry;
-    if ( is_success( $res->code ) ) {
-	$entry = XML::Atom::Entry->new( \$res->content )
-	    || return $client->error( XML::Atom::Entry->errstr );
-	$client->{cache}{$uri} = {
-	    etag => ( $res->header('ETag') || undef ),
-	    body => $entry,
-	};
-    }
-    elsif ( $res->code == RC_NOT_MODIFIED ) {
-	$entry = $client->{cache}{$uri}{body};
-    }
-    else {
-	return $client->error( $res->status_line . "\n" . $res->content );
-    }
-
-    return $entry;
+    return $client->rc;
 }
 
 sub getMedia {
@@ -170,33 +140,15 @@ sub getMedia {
 
     return $client->error('No URI') unless $uri;
 
-    my $req = HTTP::Request->new( GET => $uri );
-    my $etag = $client->{cache}{$uri}{etag};
-    $req->header( 'If-None-Match' => $etag ) if $etag;
+    $client->_get_resource( uri => $uri ) || return;
 
-    my $res = $client->make_request( $req );
+    return $client->error('Response is not Media Resource')
+	if UNIVERSAL::isa( $client->rc, 'XML::Atom::Entry' );
 
-    my $media;
-    my $content_type;
-    if ( is_success( $res->code ) ) {
-	$client->{cache}{$uri} = {
-	    etag         => ( $res->header('ETag') || undef ),
-	    body         => ( $media        = $res->content ),
-	    content_type => ( $content_type = $res->header('Content-Type') ),
-	};
-    }
-    elsif ( $res->code == RC_NOT_MODIFIED ) {
-	$media        = $client->{cache}{$uri}{body};
-	$content_type = $client->{cache}{$uri}{content_type};
-    }
-    else {
-	return $client->error( $res->status_line . "\n" . $res->content );
-    }
-
-    return wantarray ? ( $media, $res->headers ) : $media;
+    return wantarray ? ( $client->rc, $client->res->content_type ) : $client->rc;
 }
 
-sub createEntry {
+sub updateEntry {
     my $client = shift;
     my ( $uri, $entry ) = @_;
 
@@ -207,164 +159,34 @@ sub createEntry {
 	$entry = XML::Atom::Entry->new($entry)
 	    || return $client->error( XML::Atom::Entry->errstr );
     }
-
-    my $info = $client->{info}{$uri};
-
-    my $content_type = $ENTRY_TYPE;
-
-    return $client->error('Unsupported media type')
-	if $info && ! _is_acceptable_media_type( $info, $content_type );
-
-    return $client->error('Forbidden category')
-	if $info && ! _is_allowed_category( $info, $entry->category );
-
-    my $req = HTTP::Request->new( POST => $uri );
-    $req->content_type( $content_type );
-
-    my $xml = $entry->as_xml;
-    XML::Atom::Client::_utf8_off($xml);
-    $req->content_length( length $xml );
-    $req->content($xml);
-
-    my $res = $client->make_request( $req );
-
-    return $client->error( $res->status_line )
-	unless $res->code == RC_CREATED;
-    
-    return $client->error('No Locaiton') unless $res->header('Location');
-
-    warn 'No Content-Locaiton' unless $res->header('Content-Location');
-
-    return wantarray ? ( undef, $res->headers ) : $res->header('Location')
-	unless $res->content;
-
-    $entry = XML::Atom::Entry->new( \$res->content )
-	|| return $client->error( XML::Atom::Entry->errstr );
-
-    $client->{cache}{ $res->header('Location') } = {
-	etag => ( $res->header('ETag') || undef ),
-	body => $entry,
-    };
-
-    return wantarray ? ( $entry, $res->headers ) : $res->header('Location');
-}
-
-sub createMedia {
-    my $client = shift;
-    my ( $uri, $stream, $content_type ) = @_;
-
-    return $client->error('No URI')          unless $uri;
-    return $client->error('No stream')       unless $stream;
-    return $client->error('No Content-Type') unless $content_type;
-
-    my $info = $client->{info}{$uri};
-
-    return $client->error('Unsupported media type')
-	if $info && ! _is_acceptable_media_type( $info, $content_type );
-
-    my $headers = HTTP::Headers->new( 'Content-Type' => $content_type );
-
-    my $media = ref $stream ? $$stream : read_file( $stream, binmode => ':raw' )
-	|| return $client->error('No media');
-
-    my $req = HTTP::Request->new( POST => $uri, $headers, $media );
-
-    my $res = $client->make_request( $req );
-
-    return $client->error( $res->status_line )
-	unless $res->code == RC_CREATED;
-
-    return $client->error('No Locaiton') unless $res->header('Location');
-
-    warn 'No Content-Locaiton' unless $res->header('Content-Location');
-
-    return wantarray ? ( undef, $res->headers ) : $res->header('Location')
-	unless $res->content;
-
-    my $entry = XML::Atom::Entry->new( \$res->content )
-	|| return $client->error( XML::Atom::Entry->errstr );
-
-    $client->{cache}{ $res->header('Location') } = {
-	etag => ( $res->header('ETag') || undef ),
-	body => $entry,
-    };
-
-    return wantarray ? ( $entry, $res->headers ) : $res->header('Location');
-}
-
-sub editEntry {
-    my $client = shift;
-    my ( $uri, $entry ) = @_;
-
-    return $client->error('No URI')   unless $uri;
-    return $client->error('No Entry') unless $entry;
-
-    if ( ! UNIVERSAL::isa( $entry, 'XML::Atom::Entry' ) ) {
-	$entry = XML::Atom::Entry->new($entry)
-	    || return $client->error( XML::Atom::Entry->errstr );
-    }
-
-    my $req = HTTP::Request->new( PUT => $uri );
-    my $etag = $client->{cache}{$uri}{etag};
-    $req->header( 'If-Match' => $etag ) if $etag;
-    $req->content_type($ENTRY_TYPE);
-
-    my $xml = $entry->as_xml;
-    XML::Atom::Client::_utf8_off($xml);
-    $req->content_length( length $xml );
-    $req->content($xml);
-
-    my $res = $client->make_request( $req );
-
-    return $client->error( $res->status_line . "\n" . $res->content )
-	unless is_success( $res->code );
-
-    return $entry unless $res->content;
-
-    $entry = XML::Atom::Entry->new( \$res->content )
-	|| return $client->error( XML::Atom::Entry->errstr );
-
-    $client->{cache}{$uri} = {
-	etag => ( $res->header('ETag') || undef ),
-	body => $entry,
-    };
-
-    return $entry;
-}
-
-sub editMedia {
-    my $client = shift;
-    my ( $uri, $stream, $content_type ) = @_;
-
-    return $client->error('No URI')          unless $uri;
-    return $client->error('No stream')       unless $stream;
-    return $client->error('No Content-Type') unless $content_type;
-
-    ## XXX check whether content_type is acceptable?
 
     my $headers = HTTP::Headers->new;
-    my $etag = $client->{cache}{$uri}{etag};
-    $headers->header( 'If-Match' => $etag ) if $etag;
-    $headers->header( 'Content-Type' => $content_type );
+    $headers->content_type( media_type('entry') );
 
-    my $media = ref $stream ? $$stream : read_file( $stream, binmode => ':raw' )
-	|| return $client->error('No media');
+    return $client->_update_resource( uri     => $uri,
+				      rc      => $entry,
+				      headers => $headers );
+}
 
-    my $req = HTTP::Request->new( PUT => $uri, $headers, $media );
+sub updateMedia {
+    my $client = shift;
+    my ( $uri, $stream, $content_type ) = @_;
 
-    my $res = $client->make_request( $req );
+    return $client->error('No URI')          unless $uri;
+    return $client->error('No stream')       unless $stream;
+    return $client->error('No Content-Type') unless $content_type;
 
-    return $client->error( $res->status_line . "\n" . $res->content )
-	unless is_success( $res->code );
+    my $media
+	= ref $stream ? $$stream
+	:               read_file( $stream, binmode => ':raw', err_mode => 'carp' )
+	    || return $client->error('No media resource');
 
-    return wantarray ? ( $media, $res->headers ) : $media unless $res->content;
+    my $headers = HTTP::Headers->new;
+    $headers->content_type( $content_type );
 
-    $client->{cache}{$uri} = {
-	etag => ( $res->header('ETag') || undef ),
-	body => ( $media = $res->content ),
-    };
-
-    return wantarray ? ( $media, $res->headers ) : $media;
+    return $client->_update_resource( uri     => $uri,
+				      rc     => \$media,
+				      headers => $headers );
 }
 
 sub deleteEntry {
@@ -373,66 +195,322 @@ sub deleteEntry {
 
     return $client->error('No URI') unless $uri;
 
-    my $req = HTTP::Request->new( DELETE => $uri );
-    my $etag = $client->{cache}{$uri}{etag};
-    $req->header( 'If-Match' => $etag ) if $etag;
-
-    my $res = $client->make_request( $req );
-
-    return $client->error( $res->status_line . "\n" . $res->content )
-	unless is_success( $res->code );
-
-    return 1;
+    return $client->_delete_resource( uri => $uri );
 }
 
-sub deleteMedia {
+*deleteMedia = \&deleteEntry;
+
+sub _get_service {
     my $client = shift;
-    my ( $uri ) = @_;
+    my %arg = @_;
+
+    my $uri = $arg{uri};
+
+    $client->_clear;
+
+    return $client->error('No URI') unless $uri;
+
+    $client->req = HTTP::Request->new( GET => $uri );
+
+    $client->res = $client->make_request( $client->req );
+
+    return $client->error( join "\n", $client->res->status_line, $client->res->content )
+	unless is_success $client->res->code;
+
+    warn 'Bad Content-Type: ' . $client->res->content_type
+	unless media_type( $client->res->content_type )->is_a('service');
+
+    $client->rc = XML::Atom::Service->new( \$client->res->content )
+	|| return $client->error( XML::Atom::Service->errstr );
+
+    for my $work ( $client->rc->workspaces ) {
+	$client->info->put( $_->href, $_ ) for $work->collections;
+    }
+
+    return $client;
+}
+
+sub _get_categories {
+    my $client = shift;
+    my %arg = @_;
+
+    my $uri = $arg{uri};
+
+    $client->_clear;
+
+    return $client->error('No URI') unless $uri;
+
+    $client->req = HTTP::Request->new( GET => $uri );
+
+    $client->res = $client->make_request( $client->req );
+
+    return $client->error( join "\n", $client->res->status_line, $client->res->content )
+	unless is_success $client->res->code;
+
+    warn 'Bad Content-Type: ' . $client->res->content_type
+	unless media_type( $client->res->content_type )->is_a('categories');
+
+    $client->rc = XML::Atom::Categories->new( \$client->res->content )
+	|| return $client->error( XML::Atom::Categories->errstr );
+
+    return $client;
+}
+
+sub _get_feed {
+    my $client = shift;
+    my %arg = @_;
+
+    my $uri = $arg{uri};
+
+    $client->_clear;
+
+    return $client->error('No URI') unless $uri;
+
+    $client->req = HTTP::Request->new( GET => $uri );
+
+    $client->res = $client->make_request( $client->req );
+
+    return $client->error( join "\n", $client->res->status_line, $client->res->content )
+	unless is_success $client->res->code;
+
+    warn 'Bad Content-Type: ' . $client->res->content_type
+	unless media_type( $client->res->content_type )->is_a('feed');
+
+    $client->rc = XML::Atom::Feed->new( \$client->res->content )
+	|| return $client->error( XML::Atom::Feed->errstr );
+
+    return $client;
+}
+
+sub _create_resource {
+    my $client = shift;
+    my %arg = @_;
+
+    my $uri     = $arg{uri};
+    my $rc      = $arg{resource} || $arg{rc};
+    my $headers = $arg{headers};
+
+    $client->_clear;
+
+    return $client->error('No URI')      unless $uri;
+    return $client->error('No resource') unless $rc;
+    return $client->error('No headers')  unless $headers;
+
+    my $content_type = $headers->content_type;
+
+    my $info = $client->info->get( $uri );
+
+    return $client->error("Unsupported media type: $content_type")
+	unless is_acceptable_media_type( $info, $content_type );
+
+    my $content;
+    if ( UNIVERSAL::isa( $rc, 'XML::Atom::Entry' ) ) {
+	my $entry = $rc;
+
+	return $client->error('Forbidden category')
+	    unless is_allowed_category( $info, $entry->category );
+
+	$content = $entry->as_xml;
+	XML::Atom::Client::_utf8_off( $content );
+	$headers->content_type( media_type('entry') );
+	$headers->content_length( length $content );
+    }
+    elsif ( UNIVERSAL::isa( $rc, 'SCALAR' ) ) {
+	$content = $$rc;
+    }
+
+    $client->req = HTTP::Request->new( POST => $uri, $headers, $content );
+
+    $client->res = $client->make_request( $client->req );
+
+    return $client->error( join "\n", $client->res->status_line, $client->res->content )
+	unless is_success $client->res->code;
+
+    warn 'Bad status code: ' . $client->res->code
+	unless $client->res->code == RC_CREATED;
+    
+    return $client->error('No Locaiton') unless $client->res->location;
+
+#    warn 'No Content-Locaiton' unless $client->res->content_location;
+
+    return $client unless $client->res->content;
+
+    warn 'Bad Content-Type: ' . $client->res->content_type
+	unless media_type( $client->res->content_type )->is_a('entry');
+
+    $client->rc = XML::Atom::Entry->new( \$client->res->content )
+	|| return $client->error( XML::Atom::Entry->errstr );
+
+    my $last_modified = $client->res->last_modified;
+    my $etag          = $client->res->etag;
+
+    $client->cache->put( $client->res->location,
+			 rc            => $client->rc,
+			 last_modified => $last_modified,
+			 etag          => $etag );
+
+    return $client;
+}
+
+sub _get_resource {
+    my $client = shift;
+    my %arg = @_;
+
+    my $uri = $arg{uri};
+
+    $client->_clear;
 
     return $client->error('No URI') unless $uri;
 
     my $headers = HTTP::Headers->new;
-    my $etag = $client->{cache}{$uri}{etag};
-    $headers->header( 'If-Match' => $etag ) if $etag;
 
-    my $req = HTTP::Request->new( DELETE => $uri, $headers );
+    my $cache = $client->cache->get( $uri );
+    if ( $cache ) {
+	$headers->if_modified_since( datetime( $cache->last_modified )->epoch )
+	    if $cache->last_modified;
+	$headers->if_none_match( $cache->etag ) if defined $cache->etag;
+    }
 
-    my $res = $client->make_request( $req );
+    $client->req = HTTP::Request->new( GET => $uri, $headers );
 
-    return $client->error( $res->status_line . "\n" . $res->content )
-	unless is_success( $res->code );
+    $client->res = $client->make_request( $client->req );
 
-    return 1;
+    if ( is_success $client->res->code ) {
+	if ( media_type( $client->res->content_type )->is_a('entry') ) {
+	    $client->rc = XML::Atom::Entry->new( \$client->res->content )
+		|| return $client->error( XML::Atom::Entry->errstr );
+	}
+	else {
+	    $client->rc = $client->res->content;
+	}
+
+	my $last_modified = $client->res->last_modified;
+	my $etag          = $client->res->etag;
+
+	$client->cache->put( $uri, 
+			     rc            => $client->rc,
+			     last_modified => $last_modified,
+			     etag          => $etag );
+    }
+    elsif ( $client->res->code == RC_NOT_MODIFIED ) {
+	$client->rc = $cache->rc;
+    }
+    else {
+	return $client->error( join "\n", $client->res->status_line, $client->res->content );
+    }
+
+    return $client;
 }
 
-*retrieveCategories = \&getCategories;
-*retrieveService    = \&getService;
-*retrieveFeed       = \&getFeed;
-*retrieveEntry      = \&getEntry;
+sub _update_resource {
+    my $client = shift;
+    my %arg = @_;
 
-*postEntry = \&createEntry;
-*postMedia = \&createMedia;
+    my $uri     = $arg{uri};
+    my $rc      = $arg{resource} || $arg{rc};
+    my $headers = $arg{headers};
 
-*putEntry    = \&editEntry;
-*putMedia    = \&editMedia;
-*updateEntry = \&editEntry;
-*updateMedia = \&editMedia;
+    $client->_clear;
+
+    return $client->error('No URI')      unless $uri;
+    return $client->error('No resource') unless $rc;
+    return $client->error('No headers')  unless $headers;
+
+    my $content;
+    if ( UNIVERSAL::isa( $rc, 'XML::Atom::Entry' ) ) {
+	my $entry = $rc;
+
+	$content = $entry->as_xml;
+	XML::Atom::Client::_utf8_off( $content );
+	$headers->content_type( media_type('entry') );
+	$headers->content_length( length $content );
+    }
+    elsif ( UNIVERSAL::isa( $rc, 'SCALAR' ) ) {
+	$content = $$rc;
+    }
+
+    if ( my $cache = $client->cache->get( $uri ) ) {
+	$headers->if_unmodified_since( datetime( $cache->last_modified )->epoch )
+	    if $cache->last_modified;
+	$headers->if_match( $cache->etag ) if defined $cache->etag;
+    }
+
+    $client->req = HTTP::Request->new( PUT => $uri, $headers, $content );
+
+    $client->res = $client->make_request( $client->req );
+
+    return $client->error( join "\n", $client->res->status_line, $client->res->content )
+	unless is_success $client->res->code;
+
+    return $client unless $client->res->content;
+
+    if ( media_type( $client->res->content_type )->is_a('entry') ) {
+	$client->rc = XML::Atom::Entry->new( \$client->res->content )
+	    || return $client->error( XML::Atom::Entry->errstr );
+    }
+    else {
+	$client->rc = $client->res->content;
+    }
+
+    my $last_modified = $client->res->last_modified;
+    my $etag          = $client->res->etag;
+
+    $client->cache->put( $uri, 
+			 rc            => $client->rc,
+			 last_modified => $last_modified,
+			 etag          => $etag );
+
+    return $client;
+}
+
+sub _delete_resource {
+    my $client = shift;
+    my %arg = @_;
+
+    my $uri = $arg{uri};
+
+    $client->_clear;
+
+    return $client->error('No URI') unless $uri;
+
+    my $headers = HTTP::Headers->new;
+
+    if ( my $cache = $client->cache->get( $uri ) ) {
+	$headers->if_unmodified_since( datetime( $cache->last_modified )->epoch )
+	    if $cache->last_modified;
+	$headers->if_match( $cache->etag ) if defined $cache->etag;
+    }
+
+    $client->req = HTTP::Request->new( DELETE => $uri, $headers );
+
+    $client->res = $client->make_request( $client->req );
+
+    return $client->error( join "\n", $client->res->status_line, $client->res->content )
+	unless is_success $client->res->code;
+
+    return $client;
+}
+
+sub _clear {
+    my $client = shift;
+    $client->error('');
+    $client->{$_} = undef for @ATTRS;
+}
 
 sub munge_request {
     my $client = shift;
     my ( $req ) = @_;
 
-    $req->header(
-	Accept => 'application/atom+xml, application/atomsvc+xml, application/atomcat+xml, */*',
-    );
+    $req->accept( join ',', media_type('entry')->without_parameters,
+		            media_type('service'), media_type('categories'), '*/*'  );
 
     return unless $client->username;
 
     my $nonce = sha1( sha1( time . {} . rand() . $$ ) );
-    my $now = DateTime->now->iso8601 . 'Z';
+    my $now = datetime->w3cz;
 
     my $wsse = sprintf(
-        qq(UsernameToken Username="%s", PasswordDigest="%s", Nonce="%s", Created="%s"),
+        qq{UsernameToken Username="%s", PasswordDigest="%s", Nonce="%s", Created="%s"},
 	( $client->username || '' ),
         encode_base64( sha1( $nonce . $now . ( $client->password || '' ) ), '' ),
         encode_base64( $nonce, '' ),
@@ -440,44 +518,168 @@ sub munge_request {
     );
 
     $req->header('X-WSSE' => $wsse );
-    $req->header( Authorization => 'WSSE profile="UsernameToken"' );
+    $req->authorization( 'WSSE profile="UsernameToken"' );
 }
 
-sub _is_acceptable_media_type {
-    my ( $info, $content_type ) = @_;
-
-    ## XXX @accepts MUST be set as entry-type when called from Client to PUT Media Link Entry
-    my @accepts = @{ $info->{accept} };
-    @accepts = qw( application/atom+xml;type=entry ) unless @accepts;
-
-    for my $accept ( @accepts ) {
-        next unless length $accept;
-
-        ## XXX check only substring before '*' or ';'
-        my ( $regex ) = split /[*;]/, $accept;
-        $regex = quotemeta $regex;
-        return 1 if $content_type =~ /^$regex/;
+sub slug {
+    warn '$client->slug is DEPRECATED, and see $client->createEntry and $client->createMedia';
+    my $client = shift;
+    if ( @_ ) {
+	$client->ua->default_header( Slug => uri_escape uri_unescape $_[0] );
     }
-
-    return 0;
+    else {
+	uri_unescape $client->ua->default_header('Slug');
+    }
 }
 
-sub _is_allowed_category {
-    my ( $info, @cat ) = @_;
+my %OBSOLETED = ( retrieveService    => 'getService',
+		  retrieveCategories => 'getCategories',
+		  retrieveFeed       => 'getFeed',
+		  postEntry          => 'createEntry',
+		  postMedia          => 'createMedia',
+		  retrieveEntry      => 'getEntry',
+		  retrieveMedia      => 'getMedia',
+		  editEntry          => 'updateEntry',
+		  putEntry           => 'updateEntry',
+		  editMedia          => 'updateMedia',
+		  putMedia           => 'updateMedia', );
 
-    for my $cats ( @{ $info->{categories} } ) {
-        return 1 unless $cats->{fixed} eq 'yes';
+while ( my ( $obs, $new ) = each %OBSOLETED ) {
+    no strict 'refs'; ## no critic
+    *{$obs} = sub {
+	warn "\$client->$obs is DEPRECATED, and see \$client->$new";
+	shift->$new(@_);
+    };
+}
 
-        for my $cat ( @cat ) {
-            my $match
-                = grep { my $scheme = $_->{scheme} || $cats->{scheme};
-                         $_->{term} eq $cat->term && $scheme eq $cat->scheme }
-                      @{ $cats->{category} };
-            return 0 unless $match;
-        }
+package Atompub::Client::Info;
+
+my $Info;
+
+sub instance {
+    my $class = shift;
+    $Info ||= bless { info => {} }, $class;
+    $Info;
+}
+
+sub put {
+    my $self = shift;
+    my ( $uri, @args ) = @_;
+    return unless $uri;
+    if ( @args ) {
+	$self->{info}{$uri} = $self->_clone_collection( @args );
     }
+    else {
+	delete $self->{info}{$uri};
+    }
+}
 
-    return 1;
+sub get {
+    my $self = shift;
+    my ( $uri ) = @_;
+    return unless $uri;
+    return $self->{info}{$uri};
+}
+
+sub _get_categories {
+    my $self = shift;
+    my ( $client, $href ) = @_;
+    return unless $client;
+    return $client->getCategories( $href );
+}
+
+sub _clone_collection {
+    my $self = shift;
+    my ( $coll_arg, $client ) = @_;
+
+    return unless UNIVERSAL::isa( $coll_arg, 'XML::Atom::Collection' );
+    
+    my $coll = XML::Atom::Collection->new;
+
+    $coll->title( $coll_arg->title );
+    $coll->href( $coll_arg->href );
+
+    $coll->accept( $coll_arg->accepts ) if $coll_arg->accept;
+
+    my @cats = grep { defined $_ }
+                map {   $_->href ? $self->_get_categories( $client, $_->href )
+		      :            $self->_clone_categories($_) }
+                    $coll_arg->categories;
+
+    $coll->categories( @cats );
+
+    return $coll;
+}
+
+sub _clone_categories {
+    my $self = shift;
+    my ( $cats_arg ) = @_;
+
+    my $cats = XML::Atom::Categories->new;
+    $cats->fixed( $cats_arg->fixed ) if $cats_arg->fixed;
+    $cats->scheme( $cats_arg->scheme ) if $cats_arg->scheme;
+
+    my @cat = map { my $cat = XML::Atom::Category->new;
+		    $cat->term( $_->term );
+		    $cat->scheme( $_->scheme ) if $_->scheme;
+		    $cat->label( $_->label ) if $_->label;
+		    $cat }
+                  $cats_arg->category;
+    $cats->category( @cat );
+
+    return $cats;
+}
+
+package Atompub::Client::Cache;
+
+my $Cache;
+
+sub instance {
+    my $class = shift;
+    $Cache ||= bless { cache => {} }, $class;
+    $Cache;
+}
+
+sub put {
+    my $self = shift;
+    my ( $uri, @args ) = @_;
+    return unless $uri;
+    if ( @args ) {
+	$self->{cache}{$uri} = Atompub::Client::Cache::Resource->new( @args );
+    }
+    else {
+	delete $self->{cache}{$uri};
+    }
+}
+
+sub get {
+    my $self = shift;
+    my ( $uri ) = @_;
+    return unless $uri;
+    return $self->{cache}{$uri};
+}
+
+package Atompub::Client::Cache::Resource;
+
+use strict;
+use warnings;
+use base qw( Class::Accessor::Fast );
+
+__PACKAGE__->mk_accessors( qw( resource last_modified etag ) );
+
+*rc = \&resource;
+
+sub new {
+    my $class = shift;
+    my %arg = @_;
+
+    my $rc = $arg{resource} || $arg{rc} || return;
+
+    bless {
+	resource      => $rc,
+	last_modified => $arg{last_modified},
+	etag          => $arg{etag},
+    }, $class;
 }
 
 1;
@@ -488,119 +690,144 @@ __END__
 Atompub::Client - A client for the Atom Publishing Protocol
 
 
+=head1 COMPATIBILITY ISSUES
+
+L<Atompub::Client> has B<changed return values of the following methods> since v0.1.0.
+
+=over 4
+
+=item * $client->createEntry in list context
+
+=item * $client->createMedia in list context
+
+=item * $client->getMedia in list context
+
+=item * $client->updateEntry
+
+=item * $client->updateMedia
+
+=back
+
+L<Atompub::Client> B<made some methods obsolete> in v0.1.0.
+
+See L<METHODS> and L<OBSOLETED METHODS> in details.
+
+
 =head1 SYNOPSIS
 
     use Atompub::Client;
-
-    ## Constructs client objects
 
     my $client = Atompub::Client->new;
     $client->username('Melody');
     $client->password('Nelson');
     #$client->proxy( $proxy_uri );
 
-
-    ## Get Service Document
-
+    # Get a Service Document
     my $service = $client->getService( $service_uri );
+
     my @workspaces = $service->workspaces;
     my @collections = $workspaces[0]->collections;
 
-
-    ## CRUD Entry Resource
-
-    ## Assuming that the 0-th collection supports Entry Resource
+    # CRUD an Entry Resource; assuming that the 0-th collection supports 
+    # Entry Resources
     my $collection_uri = $collections[0]->href;
 
+    my $name = 'New Post';
+
     my $entry = XML::Atom::Entry->new;
-    $entry->title('New Post');
+    $entry->title( $name );
     $entry->content('Content of my post.');
 
-    my $edit_uri = $client->createEntry( $collection_uri, $entry );
-
-    my $entry = $client->getEntry( $edit_uri );
-
-    my $entry = $client->EditEntry( $edit_uri, $entry );
-
-    $client->DeleteEntry( $edit_uri );
+    my $edit_uri
+        = $client->createEntry( $collection_uri, $entry, $name );
 
     my $feed = $client->getFeed( $collection_uri );
     my @entries = $feed->entries;
 
+    $entry = $client->getEntry( $edit_uri );
 
-    ## CRUD Media Resource
+    $client->updateEntry( $edit_uri, $entry );
 
-    ## Assuming that the 1-st collection supports Media Resource
+    $client->deleteEntry( $edit_uri );
+
+    # CRUD a Media Resource; assuming that the 1-st collection supports 
+    # Media Resources
     my $collection_uri = $collections[1]->href;
 
-    my ( $entry, $headers )
-        = $client->createMedia( $collection_uri, 'sample.png', 'image/png' );
+    my $name = 'My Photo';
 
-    my $edit_uri = $headers->header('Location');
-    my ( $edit_media_uri )
-        = map { $_->href } grep { $_->rel eq 'edit-media' } $entry->link;
+    my $edit_uri
+        = $client->createMedia( $collection_uri, 'sample1.png',
+                                'image/png', $name );
+
+    # Get a href attribute of an "edit-media" link
+    my $edit_media_uri = $client->resource->edit_media_link;
     
-    my ( $binary, $headers ) = $client->getMedia( $edit_media_uri );
+    my $binary = $client->getMedia( $edit_media_uri );
 
-    my ( $binary, $headers )
-        = $client->EditMedia( $edit_media_uri, 'sample.jpg', 'image/jpeg' );
+    $client->updateMedia( $edit_media_uri, 'sample2.png', 'image/png' );
 
-    $client->DeleteEntry( $edit_media_uri );
+    $client->deleteEntry( $edit_media_uri );
+
+    # Access to the requested HTTP::Request object
+    my $request  = $client->request;
+
+    # Access to the received HTTP::Response object
+    my $response = $client->response;
+
+    # Access to the received resource (XML::Atom object or binary data)
+    my $resource = $client->resource;
 
 
 =head1 DESCRIPTION
 
-B<Atompub::Client> implements a client for the Atom Publishing Protocol 
+L<Atompub::Client> implements a client for the Atom Publishing Protocol 
 described at L<http://www.ietf.org/internet-drafts/draft-ietf-atompub-protocol-17.txt>.
 
-The client supports following features:
+The client supports the following features:
 
-=over 7
+=over 4
 
 =item * Authentication
 
-B<Atompub::Client> supports the Basic and WSSE Authentication described at 
+L<Atompub::Client> supports the Basic and WSSE Authentication described in
 L<http://www.intertwingly.net/wiki/pie/DifferentlyAbledClients>.
 
 =item * Service Document
 
-B<Atompub::Client> understands Service Document, 
+L<Atompub::Client> understands Service Documents, 
 in which information of collections are described,
 such as URIs, acceptable media types, and allowable categories.
 
-=item * Media and Entry Resource
+=item * Media Resource support
 
-Media Resource as well as Entry Resource are supported.
-You can create and edit binary resources such as image and video
-by using B<Atompub::Client>.
-
-=item * I<Slug> header
-
-The client can specify I<Slug> header when creating resources,
-which may be used as part of the resource URI.
+Media Resources (binary data) as well as Entry Resources are supported.
+You can create and edit Media Resources such as image and video
+by using L<Atompub::Client>.
 
 =item * Media type check
 
-B<Atompub::Client> automatically checks media types of the resources 
-before creating and editing them to a collection.
-Acceptable media types are shown in I<app:accept> elements of the Service Document.
+L<Atompub::Client> checks media types of resources
+before creating and editing them to the collection.
+Acceptable media types are shown in I<app:accept> elements in the Service Document.
 
 =item * Category check
 
-B<Atompub::Client> automatically checks categories of the Entry Resource 
-before creating and editing them to a collection.
-Allowable categories are shown in I<app:categories> elements of the Service Document.
+L<Atompub::Client> checks categories in Entry Resources
+before creating and editing them to the collection.
+Allowable categories are shown in I<app:categories> elements in the Service Document.
 
-=item * Cache control
+=item * Cache controll and versioning
 
-On-memory cache mechanizm is implemented in B<Atompub::Client>, 
-which is controlled by I<ETag> header.
+On-memory cache and versioning, which are controlled by I<ETag> and I<Last-Modified> header,
+are implemented in L<Atompub::Client>.
+
+=item * Naming resources by I<Slug> header
+
+The client can specify I<Slug> header when creating a resource,
+which may be used as part of the resource URI.
 
 =back
-
-This module was tested in InteropTokyo2007
-L<http://intertwingly.net/wiki/pie/July2007InteropTokyo>, 
-and interoperated with other implementations.
 
 
 =head1 METHODS
@@ -608,7 +835,7 @@ and interoperated with other implementations.
 =head2 Atompub::Client->new([ %options ])
 
 Creates a new Atompub client object.
-The options are same as B<LWP::UserAgent>.
+The options are same as L<LWP::UserAgent>.
 
 
 =head2 $client->username([ $username ])
@@ -629,77 +856,48 @@ Atompub server.
 
 =head2 $client->proxy([ $proxy_uri ])
 
-If called with an argument, sets URI of proxy server.
+If called with an argument, sets URI of proxy server like 'http://proxy.example.com:8080'.
 
 Returns the current URI of the proxy server.
 
 
-=head2 $client->slug([ $slug ])
-
-If called with an argument, sets I<Slug> header which may be used as 
-part of the resource URI.
-$slug must not be escaped.
-
-Returns the current I<Slug> header.
-
-
 =head2 $client->getService( $service_uri )
 
-Retrieves the Service Document at URI $service_uri.
+Retrieves a Service Document at URI $service_uri.
 
-Returns an B<XML::Atom::Service> object representing the Service 
-Document returned from the server.
-
-Returns false on error.
-
-
-=head2 $client->retrieveService( $service_uri )
-
-An alias for getService.
+Returns an L<XML::Atom::Service> object on success, false otherwise.
 
 
 =head2 $client->getCategories( $category_uri )
 
-Retrieves the Category Document at URI $category_uri.
+Retrieves a Category Document at URI $category_uri.
 
-Returns an B<XML::Atom::Categories> object representing the Category
-Document returned from the server.
-
-Returns false on error.
+Returns an L<XML::Atom::Categories> object on success, false otherwise.
 
 
-=head2 $client->retrieveCategories( $category_uri )
+=head2 $client->getFeed( $collection_uri )
 
-An alias for getCategories.
+Retrieves a Feed Document from the collection at URI $collection_uri.
+
+Returns an L<XML::Atom::Feed> object, false otherwise.
 
 
-=head2 $client->createEntry( $collection_uri, $entry )
+=head2 $client->createEntry( $collection_uri, $entry, [ $slug ] )
 
 Creates a new entry in the collection at URI $collection_uri.
-$entry must be an B<XML::Atom::Entry> object.
 
-If called in scalar context, returns a Location header.
+$entry must be an L<XML::Atom::Entry> object.
 
-     my $location = $client->createEntry( $collection_uri, $entry );
+If $slug is provided, it is set in I<Slug> header and may be used 
+as part of the resource URI.
 
-If called in list context, returns an B<XML::Atom::Entry> object and an 
-B<HTTP::Headers> object.
-
-     my ( $entry, $headers )
-         = $client->createEntry( $collection_uri, $entry );
-     my $location = $headers->header('Location');
-
-Returns false on error.
+Returns a I<Location> header, which contains a URI of the newly created resource,
+or false on error.
 
 
-=head2 $client->postEntry( $collection_uri, $entry )
+=head2 $client->createMedia( $collection_uri, $media, $media_type, [ $slug ] )
 
-An alias for createEntry.
-
-
-=head2 $client->createMedia( $collection_uri, $media, $media_type )
-
-Creates a new Media Resource and Media Link Entry in the collection
+Creates a new Media Resource and a Media Link Entry in the collection
 at URI $collection_uri.
 
 If $media is a reference to a scalar, it is treated as the binary.
@@ -707,87 +905,38 @@ If a scalar, treated as a file containing the Media Resource.
 
 $media_type is the media type of the Media Resource, such as 'image/png'.
 
-If called in scalar context, returns a Location header.
+$slug is set in the I<Slug> header, and may be used as part of
+the resource URI.
 
-     my $location
-         = $client->createMedia( $collection_uri, $media, $media_type );
-
-If called in list context, returns an B<XML::Atom::Entry> object of the 
-Media Link Entry and an B<HTTP::Headers> object.
-
-     my ( $entry, $headers )
-         = $client->createMedia( $collection_uri, $media, $media_type );
-     my $location = $headers->header('Location');
-
-Returns false on error.
-
-
-=head2 $client->postMedia( $collection_uri, $media, $media_type )
-
-An alias for createMedia.
+Returns a I<Location> header, which contains a URI of the newly created resource,
+or false on error.
 
 
 =head2 $client->getEntry( $edit_uri )
 
-Retrieves an entry with the given URI $edit_uri.
+Retrieves an Entry Document with the given URI $edit_uri.
 
-Returns an B<XML::Atom::Entry> object.
-If the server returns 304, returns a cache of the Media Resource.
-
-Returns false on error.
-
-
-=head2 $client->retrieveEntry( $edit_uri )
-
-An alias for getEntry.
+Returns an L<XML::Atom::Entry> object on success, false otherwise.
+If the server returns 304 (Not Modified), returns a cache of the Media Resource.
 
 
 =head2 $client->getMedia( $edit_uri )
 
-Retrieves Media Resource with the given URI $edit_uri.
+Retrieves a Media Resource with the given URI $edit_uri.
 
-If called in scalar context, returns binary of the Media Resource.
-
-     my $media = $client->getMedia( $edit_uri );
-
-If called in list context, returns binary of Media Resource and an
-B<HTTP::Headers> object. 
-If the server returns 304, returns a cache of the Media Resource.
-
-     my ( $entry, $headers ) = $client->getMedia( $edit_uri );
-     my $media_type = $headers->header('Content-Type');
-
-Returns false on error.
-
-
-=head2 $client->retrieveMedia( $edit_uri )
-
-An alias for getMedia.
-
-
-=head2 $client->editEntry( $edit_uri, $entry )
-
-Updates the entry at URI $edit_uri with the entry $entry, which must be
-an B<XML::Atom::Entry> object.
-
-Returns an B<XML::Atom::Entry> object.
-If the server returns no content with successful status code, the
-requested entry is returned.
-
-Returns false on error.
-
-
-=head2 $client->putEntry( $edit_uri, $entry )
-
-An alias for editEntry.
+Returns binary data of the Media Resource on success, false otherwise.
+If the server returns 304 (Not Modified), returns a cache of the Media Resource.
 
 
 =head2 $client->updateEntry( $edit_uri, $entry )
 
-An alias for updateEntry.
+Updates the Entry Document at URI $edit_uri with the new Entry Document $entry, 
+which must be an L<XML::Atom::Entry> object.
+
+Returns true on success, false otherwise.
 
 
-=head2 $client->editMedia( $edit_uri, $media, $media_type )
+=head2 $client->updateMedia( $edit_uri, $media, $media_type )
 
 Updates the Media Resource at URI $edit_uri with the $media.
 
@@ -796,75 +945,120 @@ If a scalar, treated as a file containing the Media Resource.
 
 $media_type is the media type of the Media Resource, such as 'image/png'.
 
-If called in scalar context, returns a Media Resource.
-
-     my $media
-         = $client->editMedia( $edit_uri, $media, $media_type );
-
-If called in list context, returns a Media Resource and an B<HTTP::Headers> 
-object.
-
-     my ( $media, $headers )
-         = $client->createMedia( $edit_uri, $media, $media_type );
-     my $media_type = $headers->header('Content-Type');
-
-If the server returns no content with successful status code, the
-requested entry is returned.
-
-Returns false on error.
-
-
-=head2 $client->putMedia( $edit_uri, $media, $media_type )
-
-An alias for editMedia.
-
-
-=head2 $client->updateMedia( $edit_uri, $media, $media_type )
-
-An alias for updateMedia.
+Returns true on success, false otherwise.
 
 
 =head2 $client->deleteEntry( $edit_uri );
 
-Deletes the entry at URI $edit_uri.
+Deletes the Entry Document at URI $edit_uri.
 
 Returns true on success, false otherwise.
 
 
 =head2 $client->deleteMedia( $edit_uri );
 
-Deletes the Media Resource at URI $edit_uri, and related Media Link Entry.
+Deletes the Media Resource at URI $edit_uri and related Media Link Entry.
 
 Returns true on success, false otherwise.
 
 
-=head2 $client->getFeed( $collection_uri )
+=head1 OBSOLETED METHODS
 
-Retrieves a feed from the collection at URI $collection_uri.
+=head2 $client->slug([ $slug ])
 
-Returns an B<XML::Atom::Feed> object representing the feed returned 
-from the server.
+This method is DEPRECATED, and see $client->createEntry and $client->createMedia.
 
-Returns false on error.
+=head2 $client->retrieveService( $service_uri )
 
+This method is DEPRECATED, and see $client->getService.
+
+=head2 $client->retrieveCategories( $category_uri )
+
+This method is DEPRECATED, and see $client->getCategories.
 
 =head2 $client->retrieveFeed( $collection_uri )
 
-An alias for getFeed.
+This method is DEPRECATED, and see $client->getFeed.
+
+=head2 $client->postEntry( $collection_uri, $entry )
+
+This method is DEPRECATED, and see $client->createEntry.
+
+=head2 $client->postMedia( $collection_uri, $media, $media_type )
+
+This method is DEPRECATED, and see $client->createMedia.
+
+=head2 $client->retrieveEntry( $edit_uri )
+
+This method is DEPRECATED, and see $client->getEntry.
+
+=head2 $client->retrieveMedia( $edit_uri )
+
+This method is DEPRECATED, and see $client->getMedia.
+
+=head2 $client->editEntry( $edit_uri, $entry )
+
+This method is DEPRECATED, and see $client->updatedEntry.
+
+=head2 $client->putEntry( $edit_uri, $entry )
+
+This method is DEPRECATED, and see $client->updatedEntry.
+
+=head2 $client->editMedia( $edit_uri, $media, $media_type )
+
+This method is DEPRECATED, and see $client->updatedMedia.
+
+=head2 $client->putMedia( $edit_uri, $media, $media_type )
+
+This method is DEPRECATED, and see $client->updatedMedia.
 
 
-=head2 $client->_info( $collection )
+=head1 INTERNAL INTERFACES
+
+=head2 $client->init
+
+=head2 $client->ua
+
+Accessor to the UserAgent.
+
+=head2 $client->info
+
+An accessor to information of Collections described in a Service Document.
+
+=head2 $client->cache
+
+An accessor to the resource cache.
 
 =head2 $client->munge_request( $req )
 
-=head2 $client->init
+=head2 $client->_clear
+
+=head2 $client->_get_service( %args )
+
+=head2 $client->_get_categories( %args )
+
+=head2 $client->_get_feed( %args )
+
+=head2 $client->_create_resource( %args )
+
+=head2 $client->_get_resource( %args )
+
+=head2 $client->_update_resource( %args )
+
+=head2 $client->_delete_resource( %args )
+
+
+=head1 ERROR HANDLING
+
+Methods return C<undef> on error, and the error message can be retrieved
+using the I<errstr> method.
 
 
 =head1 SEE ALSO
 
 L<XML::Atom>
 L<XML::Atom::Service>
-L<Atompub::Server>
+L<Atompub>
 
 
 =head1 AUTHOR

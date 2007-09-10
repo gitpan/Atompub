@@ -2,19 +2,60 @@ package Atompub;
 
 use warnings;
 use strict;
-use Carp;
 
-use version; our $VERSION = qv('0.0.2');
+use version; our $VERSION = qv('0.1.0');
 
-# Other recommended modules (uncomment to use):
-#  use IO::Prompt;
-#  use Perl6::Export;
-#  use Perl6::Slurp;
-#  use Perl6::Say;
+use HTTP::Headers;
+use HTTP::Request;
+use HTTP::Response;
+use XML::Atom 0.25;
+use XML::Atom::Service 0.15.0;
 
+our %REQUEST_HEADERS  = ( accept              => 'Accept',
+			  if_match            => 'If-Match',
+			  if_none_match       => 'If-None-Match',
+			  if_modified_since   => 'If-Modified-Since',
+			  if_unmodified_since => 'If-Unmodified-Since', );
 
-# Module implementation here
+our %RESPONSE_HEADERS = ( content_location    => 'Content-Location',
+			  etag                => 'ETag',
+			  location            => 'Location', );
 
+our %ENTITY_HEADERS   = ( last_modified       => 'Last-Modified',
+			  slug                => 'Slug', );
+
+while ( my ( $method, $header ) = each %REQUEST_HEADERS ) {
+    no strict 'refs'; ## no critic
+    if ( ! HTTP::Headers->can( $method ) ) {
+	*{ "HTTP::Headers::$method" } = sub { shift->header( $header, @_ ) };
+    }
+    if ( ! HTTP::Request->can( $method ) ) {
+	*{ "HTTP::Request::$method" } = sub { shift->header( $header, @_ ) };
+    }
+}
+
+while ( my ( $method, $header ) = each %RESPONSE_HEADERS ) {
+    no strict 'refs'; ## no critic
+    if ( ! HTTP::Headers->can( $method ) ) {
+	*{ "HTTP::Headers::$method" } = sub { shift->header( $header, @_ ) };
+    }
+    if ( ! HTTP::Response->can( $method ) ) {
+	*{ "HTTP::Response::$method" } = sub { shift->header( $header, @_ ) };
+    }
+}
+
+while ( my ( $method, $header ) = each %ENTITY_HEADERS ) {
+    no strict 'refs'; ## no critic
+    if ( ! HTTP::Headers->can( $method ) ) {
+	*{ "HTTP::Headers::$method" } = sub { shift->header( $header, @_ ) };
+    }
+    if ( ! HTTP::Request->can( $method ) ) {
+	*{ "HTTP::Request::$method" } = sub { shift->header( $header, @_ ) };
+    }
+    if ( ! HTTP::Response->can( $method ) ) {
+	*{ "HTTP::Response::$method" } = sub { shift->header( $header, @_ ) };
+    }
+}
 
 1; # Magic true value required at end of module
 __END__
@@ -30,9 +71,84 @@ The Atom Publishing Protocol (Atompub) is a protocol for publishing and
 editing Web resources described at
 L<http://www.ietf.org/internet-drafts/draft-ietf-atompub-protocol-17.txt>.
 
-B<Atompub> implements client and server for the protocol.
-B<XML::Atom> and B<XML::Atom::Service> implement XML formats used in 
-the protocol.
+L<Atompub> implements client L<Atompub::Client> and server L<Atompub::Server> for the protocol.
+XML formats used in the protocol are implemented in L<XML::Atom> and 
+L<XML::Atom::Service>.
+Catalyst extension L<Catalyst::Controller::Atompub> is also available.
+
+This module was tested in InteropTokyo2007
+L<http://intertwingly.net/wiki/pie/July2007InteropTokyo>, 
+and interoperated with other implementations.
+
+
+=head1 METHODS of HTTP::Headers, HTTP::Request, and HTTP::Response
+
+Some accessors for the HTTP header fields, which are used in the Atom Publishing Protocol, 
+are imported into L<HTTP::Headers>, L<HTTP::Request>, and L<HTTP::Response>.
+See L<http://www.ietf.org/rfc/rfc2616.txt> in detail.
+
+
+=head2 $headers->accept([ $value ])
+
+An accessor for the I<Accept> header field.
+
+This method is imported into L<HTTP::Headers> and L<HTTP::Request>.
+
+=head2 $headers->if_match([ $value ])
+
+An accessor for the I<If-Match> header field.
+
+This method is imported into L<HTTP::Headers> and L<HTTP::Request>.
+
+=head2 $headers->if_none_match([ $value ])
+
+An accessor for the I<If-None-Match> header field.
+
+This method is imported into L<HTTP::Headers> and L<HTTP::Request>.
+
+=head2 $headers->if_modified_since([ $value ])
+
+An accessor for the I<If-Modified-Since> header field.
+$value MUST be UTC epoch value, like C<1167609600>.
+
+This method is imported into L<HTTP::Headers> and L<HTTP::Request>.
+
+=head2 $headers->if_unmodified_since([ $value ])
+
+An accessor for the I<If-Unmodified-Since> header field.
+$value MUST be UTC epoch value, like C<1167609600>.
+
+This method is imported into L<HTTP::Headers> and L<HTTP::Request>.
+
+=head2 $headers->content_location([ $value ])
+
+An accessor for the I<Content-Location> header field.
+
+This method is imported into L<HTTP::Headers> and L<HTTP::Response>.
+
+=head2 $headers->etag([ $value ])
+
+An accessor for the I<ETag> header field.
+
+This method is imported into L<HTTP::Headers> and L<HTTP::Response>.
+
+=head2 $headers->location([ $value ])
+
+An accessor for the I<Location> header field.
+
+This method is imported into L<HTTP::Headers> and L<HTTP::Response>.
+
+=head2 $headers->last_modified([ $value ])
+
+An accessor for the I<Last-Modified> header field.
+
+This method is imported into L<HTTP::Headers>, L<HTTP::Request>, and L<HTTP::Response>.
+
+=head2 $headers->slug([ $value ])
+
+An accessor for the I<Slug> header field.
+
+This method is imported into L<HTTP::Headers>, L<HTTP::Request>, and L<HTTP::Response>.
 
 
 =head1 AUTHOR
