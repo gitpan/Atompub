@@ -25,12 +25,11 @@ sub new {
     my $class = shift;
     my ( $arg ) = @_;
 
-    return $arg if UNIVERSAL::isa $arg, __PACKAGE__;
-
-    my $epoch = ! $arg                   ? time
-	      :   $arg =~ qr{^\d{1,13}$} ? $arg
-              :   $arg =~ qr{^\d{14}$}   ? _parse_timestamp( $arg )
-	      :                            str2time $arg;
+    my $epoch = ! $arg                          ? time
+	      : UNIVERSAL::can( $arg, 'epoch' ) ? $arg->epoch
+	      : $arg =~ qr{^\d{1,13}$}          ? $arg
+              : $arg =~ qr{^\d{14}$}            ? _parse_timestamp( $arg )
+	      :                                   str2time $arg;
 
     return unless defined $epoch;
 
@@ -116,9 +115,20 @@ Atompub::DateTime - A date and time object for the Atom Publishing Protocol
 
 =head1 SYNOPSIS
 
+    # assuming the local timezone is JST (+09:00)
+
     use Atompub::DateTime qw( datetime );
 
-    my $dt = datetime('2007-01-01T00:00:00Z');
+    $dt = datetime;                                  # current time
+    $dt = datetime( DateTime->new );
+    $dt = datetime(1167609600);                      # UTC epoch value
+    $dt = datetime('20070101090000');
+    $dt = datetime('2007-01-01 09:00:00');
+    $dt = datetime('2007-01-01 00:00:00Z');
+    $dt = datetime('2007-01-01T09:00:00+09:00');
+    $dt = datetime('2007-01-01T00:00:00Z');
+    $dt = datetime('Mon, 01 Jan 2007 00:00:00 GMT');
+
     $dt->epoch; # 1167609600 (UTC epoch value)
     $dt->iso;   # 2007-01-01 09:00:00 (in localtime)
     $dt->isoz;  # 2007-01-01 00:00:00Z
@@ -126,15 +136,13 @@ Atompub::DateTime - A date and time object for the Atom Publishing Protocol
     $dt->w3cz;  # 2007-01-01T00:00:00Z
     $dt->str;   # Mon, 01 Jan 2007 00:00:00 GMT
 
-    $dt = datetime(1167609600);
-    $dt = datetime('2007-01-01 09:00:00');
-    $dt = datetime('2007-01-01 00:00:00Z');
-    $dt = datetime('2007-01-01T09:00:00+09:00');
-    $dt = datetime('2007-01-01T00:00:00Z');
-    $dt = datetime('Mon, 01 Jan 2007 00:00:00 GMT');
-    $dt = datetime; # current time
+    my $dt2 = datetime( $dt ); # copy
 
-    $dt->dt; # DateTime object    
+    $dt == $dt2; # compare
+
+    "$dt"; # $dt->w3c
+
+    $dt->dt; # DateTime object
 
 =head1 METHODS
 
@@ -187,7 +195,11 @@ Returns a human readable representation.
 
 =head2 $datetime->dt
 
+An accessor for the internal L<DateTime> object.
+
 =head2 $datetime->gz
+
+An accessor for the internal L<Atompub::DateTime::TimeZone> object.
 
 
 =head1 INTERNAL INTERFACES
