@@ -475,11 +475,12 @@ sub _delete_resource {
 
     my $headers = HTTP::Headers->new;
 
-    if ( my $cache = $client->cache->get( $uri ) ) {
-	$headers->if_unmodified_since( datetime( $cache->last_modified )->epoch )
-	    if $cache->last_modified;
-	$headers->if_match( $cache->etag ) if defined $cache->etag;
-    }
+# If-Match nor If-Unmodified-Since header is not required on DELETE
+#    if ( my $cache = $client->cache->get( $uri ) ) {
+#	$headers->if_unmodified_since( datetime( $cache->last_modified )->epoch )
+#	    if $cache->last_modified;
+#	$headers->if_match( $cache->etag ) if defined $cache->etag;
+#    }
 
     $client->req = HTTP::Request->new( DELETE => $uri, $headers );
 

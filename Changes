@@ -1,3 +1,9 @@
+2007-09-14  Takeru INOUE  <takeru.inoue _ gmail.com>
+
+	* release 0.1.2:
+	* Atompub/Client.pm
+	- don't use If-Match and/or If-Unmodified-Since headers on DELETE
+
 2007-09-12  Takeru INOUE  <takeru.inoue _ gmail.com>
 
 	* release 0.1.1:
