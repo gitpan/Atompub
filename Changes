@@ -1,3 +1,9 @@
+2007-09-17  Takeru INOUE  <takeru.inoue _ gmail.com>
+
+	* release 0.1.4:
+	* Build.PL
+	- add Class::Accessor::Lvalue::Fast to requires
+
 2007-09-16  Takeru INOUE  <takeru.inoue _ gmail.com>
 
 	* release 0.1.3:

@@ -12,6 +12,7 @@ my $builder = Module::Build->new(
         'version'    => 0,
 
 	'Class::Accessor::Fast' => 0,
+	'Class::Accessor::Lvalue::Fast' => 0,
 	'DateTime' => 0,
         'Digest::SHA1' => 0,
         'File::Slurp' => 0,
