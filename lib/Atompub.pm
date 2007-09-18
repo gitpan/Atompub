@@ -3,13 +3,13 @@ package Atompub;
 use warnings;
 use strict;
 
-use version; our $VERSION = qv('0.1.4');
+use version; our $VERSION = qv('0.1.5');
 
 use HTTP::Headers;
 use HTTP::Request;
 use HTTP::Response;
-use XML::Atom 0.25;
-use XML::Atom::Service 0.15.0;
+use XML::Atom;
+use XML::Atom::Service 0.15.4;
 
 our %REQUEST_HEADERS  = ( accept              => 'Accept',
 			  if_match            => 'If-Match',

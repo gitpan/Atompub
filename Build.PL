@@ -26,8 +26,7 @@ my $builder = Module::Build->new(
 	'Perl6::Export::Attrs' => 0,
         'Test::Perl::Critic' => 0,
 	'URI::Escape' => 0,
-        'XML::Atom' => 0.25,
-        'XML::Atom::Service' => '0.15.0',
+        'XML::Atom::Service' => '0.15.4',
     },
     add_to_cleanup      => [ 'Atompub-*' ],
 );

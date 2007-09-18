@@ -10,6 +10,7 @@ lib/Atompub/DateTime.pm
 lib/Atompub/MediaType.pm
 lib/Atompub/Server.pm
 lib/Atompub/Util.pm
+t/.htaccess
 t/00.load.t
 t/01.atompub.t
 t/02.datetime.t

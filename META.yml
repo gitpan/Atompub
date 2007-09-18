@@ -1,6 +1,6 @@
 ---
 name: Atompub
-version: 0.1.4
+version: 0.1.5
 author:
   - 'Takeru INOUE <takeru.inoue _ gmail.com>'
 abstract: Atom Publishing Protocol implementation
@@ -24,13 +24,12 @@ requires:
   Test::More: 0
   Test::Perl::Critic: 0
   URI::Escape: 0
-  XML::Atom: 0.25
-  XML::Atom::Service: 0.15.0
+  XML::Atom::Service: 0.15.4
   version: 0
 provides:
   Atompub:
     file: lib/Atompub.pm
-    version: 0.1.4
+    version: 0.1.5
   Atompub::Client:
     file: lib/Atompub/Client.pm
   Atompub::Client::Cache:
