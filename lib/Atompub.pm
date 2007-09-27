@@ -3,7 +3,7 @@ package Atompub;
 use warnings;
 use strict;
 
-use version; our $VERSION = qv('0.1.6');
+use version; our $VERSION = qv('0.1.7');
 
 use HTTP::Headers;
 use HTTP::Request;

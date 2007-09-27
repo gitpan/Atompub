@@ -839,29 +839,6 @@ Creates a new Atompub client object.
 The options are same as L<LWP::UserAgent>.
 
 
-=head2 $client->username([ $username ])
-
-If called with an argument, sets the username for login to $username.
-
-Returns the current username that will be used when logging in to the 
-Atompub server.
-
-
-=head2 $client->password([ $password ])
-
-If called with an argument, sets the password for login to $password.
-
-Returns the current password that will be used when logging in to the 
-Atompub server.
-
-
-=head2 $client->proxy([ $proxy_uri ])
-
-If called with an argument, sets URI of proxy server like 'http://proxy.example.com:8080'.
-
-Returns the current URI of the proxy server.
-
-
 =head2 $client->getService( $service_uri )
 
 Retrieves a Service Document at URI $service_uri.
@@ -949,18 +926,64 @@ $media_type is the media type of the Media Resource, such as 'image/png'.
 Returns true on success, false otherwise.
 
 
-=head2 $client->deleteEntry( $edit_uri );
+=head2 $client->deleteEntry( $edit_uri )
 
 Deletes the Entry Document at URI $edit_uri.
 
 Returns true on success, false otherwise.
 
 
-=head2 $client->deleteMedia( $edit_uri );
+=head2 $client->deleteMedia( $edit_uri )
 
 Deletes the Media Resource at URI $edit_uri and related Media Link Entry.
 
 Returns true on success, false otherwise.
+
+
+=head1 Accessors
+
+=head2 $client->username([ $username ])
+
+If called with an argument, sets the username for login to $username.
+
+Returns the current username that will be used when logging in to the 
+Atompub server.
+
+
+=head2 $client->password([ $password ])
+
+If called with an argument, sets the password for login to $password.
+
+Returns the current password that will be used when logging in to the 
+Atompub server.
+
+
+=head2 $client->proxy([ $proxy_uri ])
+
+If called with an argument, sets URI of proxy server like 'http://proxy.example.com:8080'.
+
+Returns the current URI of the proxy server.
+
+
+=head2 $client->resource
+
+=head2 $client->rc
+
+An accessor for Entry or Media Resource, which was retrieved in the previous action.
+
+
+=head2 $client->request
+
+=head2 $client->req
+
+An accessor for an L<HTTP::Request> object, which was used in the previous action.
+
+
+=head2 $client->response
+
+=head2 $client->res
+
+An accessor for an L<HTTP::Response> object, which was used in the previous action.
 
 
 =head1 OBSOLETED METHODS
