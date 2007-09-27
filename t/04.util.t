@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 #use Data::Dumper; $Data::Dumper::Indent = 1;
-use Test::More tests => 24;
+use Test::More tests => 25;
 
 use Atompub::MediaType qw( media_type );
 use Atompub::Util qw( is_acceptable_media_type is_allowed_category );
@@ -72,3 +72,8 @@ $cats->category( $cat1 );
 $cats->scheme( 'http://example.com/cats/big3' );
 ok ! is_allowed_category( $coll, $cat1 );
 ok   is_allowed_category( $coll, $cat1_s );
+
+
+$coll = XML::Atom::Collection->new; # no app:categories
+
+ok is_allowed_category( $coll, $cat1 );

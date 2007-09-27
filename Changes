@@ -1,3 +1,10 @@
+2007-09-27  Takeru INOUE  <takeru.inoue _ gmail.com>
+
+	* release 0.1.6:
+	* Atompub/Util.pm
+	- fix a bug in is_allowed_category, which reproduced if no
+	  app:categories
+
 2007-09-17  Takeru INOUE  <takeru.inoue _ gmail.com>
 
 	* release 0.1.5:

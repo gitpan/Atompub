@@ -23,6 +23,7 @@ sub is_allowed_category :Export {
     my ( $coll, @tests ) = @_;
 
     return 1 unless $coll;
+    return 1 unless $coll->categories;
 
     return 1 if grep { ! $_->fixed || $_->fixed ne 'yes' } $coll->categories;
 
