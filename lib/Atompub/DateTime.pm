@@ -23,6 +23,13 @@ __PACKAGE__->mk_accessors( qw( dt tz ) );
 
 sub new {
     my $class = shift;
+    my $self = bless {}, $class;
+    $self->init( @_ ) || return;
+    $self;
+}
+
+sub init {
+    my $self = shift;
     my ( $arg ) = @_;
 
     my $epoch = ! $arg                          ? time
@@ -33,10 +40,10 @@ sub new {
 
     return unless defined $epoch;
 
-    bless {
-	dt => DateTime->from_epoch( epoch => $epoch, time_zone => $TZ->hm ),
-	tz => $TZ,
-    }, $class;
+    $self->dt( DateTime->from_epoch( epoch => $epoch, time_zone => $TZ->hm ) );
+    $self->tz( $TZ );
+
+    $self;
 }
 
 sub datetime :Export { __PACKAGE__->new(@_) }
@@ -203,6 +210,8 @@ An accessor for the internal L<Atompub::DateTime::TimeZone> object.
 
 
 =head1 INTERNAL INTERFACES
+
+=head2 $datetime->init
 
 =head2 $datetime->_parse_timestamp
 
