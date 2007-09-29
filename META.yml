@@ -1,6 +1,6 @@
 ---
 name: Atompub
-version: 0.1.8
+version: 0.1.9
 author:
   - 'Takeru INOUE <takeru.inoue _ gmail.com>'
 abstract: Atom Publishing Protocol implementation
@@ -10,7 +10,10 @@ resources:
 requires:
   Class::Accessor::Fast: 0
   Class::Accessor::Lvalue::Fast: 0
+  Class::Data::Inheritable: 0
   DateTime: 0
+  DateTime::Format::W3CDTF: 0
+  DateTime::TimeZone: 0
   Digest::SHA1: 0
   File::Slurp: 0
   HTTP::Date: 0
@@ -29,7 +32,7 @@ requires:
 provides:
   Atompub:
     file: lib/Atompub.pm
-    version: 0.1.8
+    version: 0.1.9
   Atompub::Client:
     file: lib/Atompub/Client.pm
   Atompub::Client::Cache:
@@ -39,8 +42,6 @@ provides:
   Atompub::Client::Info:
     file: lib/Atompub/Client.pm
   Atompub::DateTime:
-    file: lib/Atompub/DateTime.pm
-  Atompub::DateTime::TimeZone:
     file: lib/Atompub/DateTime.pm
   Atompub::MediaType:
     file: lib/Atompub/MediaType.pm

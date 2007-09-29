@@ -13,7 +13,10 @@ my $builder = Module::Build->new(
 
 	'Class::Accessor::Fast' => 0,
 	'Class::Accessor::Lvalue::Fast' => 0,
+	'Class::Data::Inheritable' => 0,
 	'DateTime' => 0,
+	'DateTime::Format::W3CDTF' => 0,
+	'DateTime::TimeZone' => 0,
         'Digest::SHA1' => 0,
         'File::Slurp' => 0,
 	'HTTP::Date' => 0,

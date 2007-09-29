@@ -5,11 +5,13 @@ use warnings;
 
 use Atompub;
 use DateTime;
+use DateTime::Format::W3CDTF;
+use DateTime::TimeZone;
 use HTTP::Date qw( str2time time2isoz time2str );
 use Perl6::Export::Attrs;
 use Time::Local;
 
-use base qw( Class::Accessor::Fast );
+use base qw( Class::Accessor::Fast Class::Data::Inheritable );
 
 use overload (
     q{""}    => \&w3c,
@@ -17,9 +19,10 @@ use overload (
     fallback => 1,
 );
 
-my $TZ = Atompub::DateTime::TimeZone->new;
+__PACKAGE__->mk_classdata( tz  => DateTime::TimeZone->new( name => 'local' ) );
+__PACKAGE__->mk_classdata( fmt => DateTime::Format::W3CDTF->new );
 
-__PACKAGE__->mk_accessors( qw( dt tz ) );
+__PACKAGE__->mk_accessors( qw( dt ) );
 
 sub new {
     my $class = shift;
@@ -40,8 +43,10 @@ sub init {
 
     return unless defined $epoch;
 
-    $self->dt( DateTime->from_epoch( epoch => $epoch, time_zone => $TZ->hm ) );
-    $self->tz( $TZ );
+    my $dt = DateTime->from_epoch( epoch     => $epoch,
+				   time_zone => $self->tz,
+				   formatter => $self->fmt, );
+    $self->dt( $dt );
 
     $self;
 }
@@ -68,15 +73,15 @@ sub isoz {
     
 sub w3c {
     my $self = shift;
-    $self->{w3c}
-        ||= sprintf '%sT%s%s', $self->dt->ymd, $self->dt->hms, $self->tz->hm;
+    $self->{w3c} ||= '' . $self->dt;
 }
 
 sub w3cz {
     my $self = shift;
     if ( ! $self->{w3cz} ) {
-	my $dt = DateTime->from_epoch( epoch => $self->epoch );
-	$self->{w3cz} = sprintf '%sT%sZ', $dt->ymd, $dt->hms;
+	my $w3cz = time2isoz $self->epoch;
+	$w3cz =~ s/ /T/;
+	$self->{w3cz} = $w3cz;
     }
     $self->{w3cz};
 }
@@ -84,32 +89,6 @@ sub w3cz {
 sub str {
     my $self = shift;
     $self->{str} ||= time2str $self->epoch;
-}
-
-
-package Atompub::DateTime::TimeZone;
-
-use strict;
-use warnings;
-
-use Time::Local;
-
-use base qw( Class::Accessor::Fast );
-
-__PACKAGE__->mk_accessors( qw( sec ) );
-
-sub new {
-    my $class = shift;
-    my $now = time;
-    bless {
-	sec => timegm( localtime($now) ) - timegm( gmtime($now) ),
-    }, $class;
-}
-
-sub hm {
-    my $self = shift;
-    sprintf "%+03d:%02d",
-            int( $self->sec / 3600 ), int( ( $self->sec % 3600 ) / 60 );
 }
 
 1;
@@ -206,7 +185,11 @@ An accessor for the internal L<DateTime> object.
 
 =head2 $datetime->gz
 
-An accessor for the internal L<Atompub::DateTime::TimeZone> object.
+An accessor for the internal L<DateTime::TimeZone> object.
+
+=head2 $datetime->fmt
+
+An accessor for the internal L<DateTime::Format> object.
 
 
 =head1 INTERNAL INTERFACES

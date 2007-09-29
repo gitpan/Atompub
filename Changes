@@ -1,3 +1,10 @@
+2007-09-29  Takeru INOUE  <takeru.inoue _ gmail.com>
+
+	* release 0.1.9:
+	* Atompub/DateTime.pm
+	- replace Atompub::Datetime::TimeZone by DateTime::TimeZone
+	- use DateTime::Format::W3CDTF and Class::Data::Inheritable
+
 2007-09-28  Takeru INOUE  <takeru.inoue _ gmail.com>
 
 	* release 0.1.8:
