@@ -12,15 +12,20 @@ BEGIN {
 use Atompub::DateTime qw( datetime );
 use Time::Local;
 
-sub tz {
+sub diff {
     my $now = time;
     my $diff = timegm( localtime( $now ) ) - timegm( gmtime( $now ) );
-    sprintf "%+03d:%02d", int( $diff / 3600 ), int( ( $diff % 3600 ) / 60 );
+}
+
+sub tz {
+    my $diff = diff();
+    my $tz = sprintf "%+03d:%02d", int( $diff / 3600 ), int( ( $diff % 3600 ) / 60 );
+    $tz eq '+00:00' ? 'Z' : $tz;
 }
 
 my $dt = datetime;
 
-is $dt->epoch, 1167613200;
+is $dt->epoch, 1167645600 - diff();
 is $dt->iso,   '2007-01-01 10:00:00';
 is $dt->w3c,   '2007-01-01T10:00:00' . tz();
 

@@ -19,8 +19,8 @@ $entry->title('Entry 1');
 
 my $uri = 'http://example.com/text/1';
 $cache->put( $uri,
-	     rc   => $entry,
-	     etag => 'tag:abc', );
+	     { rc   => $entry,
+	       etag => 'tag:abc' } );
 my $rc = $cache->get( $uri );
 isa_ok $rc, 'Atompub::Client::Cache::Resource';
 

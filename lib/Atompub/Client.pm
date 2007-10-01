@@ -46,7 +46,7 @@ sub getService {
 
     return $client->error('No URI') unless $uri;
 
-    $client->_get_service( uri => $uri ) || return;
+    $client->_get_service( { uri => $uri } ) || return;
 
     return $client->rc;
 }
@@ -57,7 +57,7 @@ sub getCategories {
 
     return $client->error('No URI') unless $uri;
 
-    $client->_get_categories( uri => $uri ) || return;
+    $client->_get_categories( { uri => $uri } ) || return;
 
     return $client->rc;
 }
@@ -68,7 +68,7 @@ sub getFeed {
 
     return $client->error('No URI') unless $uri;
 
-    $client->_get_feed( uri => $uri ) || return;
+    $client->_get_feed( { uri => $uri } ) || return;
 
     return $client->rc;
 }
@@ -89,9 +89,9 @@ sub createEntry {
     $headers->content_type( media_type('entry') );
     $headers->slug( uri_escape uri_unescape $slug ) if defined $slug;
 
-    $client->_create_resource( uri     => $uri,
-			       rc      => $entry,
-			       headers => $headers ) || return;
+    $client->_create_resource( { uri     => $uri,
+				 rc      => $entry,
+				 headers => $headers } ) || return;
 
     return $client->res->location;
 }
@@ -113,9 +113,9 @@ sub createMedia {
     $headers->content_type( $content_type );
     $headers->slug( uri_escape uri_unescape $slug ) if defined $slug;
 
-    $client->_create_resource( uri     => $uri, 
-			       rc      => \$media, 
-			       headers => $headers ) || return;
+    $client->_create_resource( { uri     => $uri, 
+				 rc      => \$media, 
+				 headers => $headers } ) || return;
 
     return $client->res->location;
 }
@@ -126,7 +126,7 @@ sub getEntry {
 
     return $client->error('No URI') unless $uri;
 
-    $client->_get_resource( uri => $uri ) || return;
+    $client->_get_resource( { uri => $uri } ) || return;
 
     return $client->error('Response is not Atom Entry')
 	unless UNIVERSAL::isa( $client->rc, 'XML::Atom::Entry' );
@@ -140,7 +140,7 @@ sub getMedia {
 
     return $client->error('No URI') unless $uri;
 
-    $client->_get_resource( uri => $uri ) || return;
+    $client->_get_resource( { uri => $uri } ) || return;
 
     return $client->error('Response is not Media Resource')
 	if UNIVERSAL::isa( $client->rc, 'XML::Atom::Entry' );
@@ -163,9 +163,9 @@ sub updateEntry {
     my $headers = HTTP::Headers->new;
     $headers->content_type( media_type('entry') );
 
-    return $client->_update_resource( uri     => $uri,
-				      rc      => $entry,
-				      headers => $headers );
+    return $client->_update_resource( { uri     => $uri,
+					rc      => $entry,
+					headers => $headers } );
 }
 
 sub updateMedia {
@@ -184,9 +184,9 @@ sub updateMedia {
     my $headers = HTTP::Headers->new;
     $headers->content_type( $content_type );
 
-    return $client->_update_resource( uri     => $uri,
-				      rc     => \$media,
-				      headers => $headers );
+    return $client->_update_resource( { uri     => $uri,
+					rc     => \$media,
+					headers => $headers } );
 }
 
 sub deleteEntry {
@@ -195,16 +195,16 @@ sub deleteEntry {
 
     return $client->error('No URI') unless $uri;
 
-    return $client->_delete_resource( uri => $uri );
+    return $client->_delete_resource( { uri => $uri } );
 }
 
 *deleteMedia = \&deleteEntry;
 
 sub _get_service {
     my $client = shift;
-    my %arg = @_;
+    my ( $args ) = @_;
 
-    my $uri = $arg{uri};
+    my $uri = $args->{uri};
 
     $client->_clear;
 
@@ -232,9 +232,9 @@ sub _get_service {
 
 sub _get_categories {
     my $client = shift;
-    my %arg = @_;
+    my ( $args ) = @_;
 
-    my $uri = $arg{uri};
+    my $uri = $args->{uri};
 
     $client->_clear;
 
@@ -258,9 +258,9 @@ sub _get_categories {
 
 sub _get_feed {
     my $client = shift;
-    my %arg = @_;
+    my ( $args ) = @_;
 
-    my $uri = $arg{uri};
+    my $uri = $args->{uri};
 
     $client->_clear;
 
@@ -284,11 +284,11 @@ sub _get_feed {
 
 sub _create_resource {
     my $client = shift;
-    my %arg = @_;
+    my ( $args ) = @_;
 
-    my $uri     = $arg{uri};
-    my $rc      = $arg{resource} || $arg{rc};
-    my $headers = $arg{headers};
+    my $uri     = $args->{uri};
+    my $rc      = $args->{resource} || $args->{rc};
+    my $headers = $args->{headers};
 
     $client->_clear;
 
@@ -345,18 +345,18 @@ sub _create_resource {
     my $etag          = $client->res->etag;
 
     $client->cache->put( $client->res->location,
-			 rc            => $client->rc,
-			 last_modified => $last_modified,
-			 etag          => $etag );
+			 {  rc            => $client->rc,
+			    last_modified => $last_modified,
+			    etag          => $etag           } );
 
     return $client;
 }
 
 sub _get_resource {
     my $client = shift;
-    my %arg = @_;
+    my ( $args ) = @_;
 
-    my $uri = $arg{uri};
+    my $uri = $args->{uri};
 
     $client->_clear;
 
@@ -388,9 +388,9 @@ sub _get_resource {
 	my $etag          = $client->res->etag;
 
 	$client->cache->put( $uri, 
-			     rc            => $client->rc,
-			     last_modified => $last_modified,
-			     etag          => $etag );
+			     {  rc            => $client->rc,
+				last_modified => $last_modified,
+				etag          => $etag           } );
     }
     elsif ( $client->res->code == RC_NOT_MODIFIED ) {
 	$client->rc = $cache->rc;
@@ -404,11 +404,11 @@ sub _get_resource {
 
 sub _update_resource {
     my $client = shift;
-    my %arg = @_;
+    my ( $args ) = @_;
 
-    my $uri     = $arg{uri};
-    my $rc      = $arg{resource} || $arg{rc};
-    my $headers = $arg{headers};
+    my $uri     = $args->{uri};
+    my $rc      = $args->{resource} || $args->{rc};
+    my $headers = $args->{headers};
 
     $client->_clear;
 
@@ -456,18 +456,18 @@ sub _update_resource {
     my $etag          = $client->res->etag;
 
     $client->cache->put( $uri, 
-			 rc            => $client->rc,
-			 last_modified => $last_modified,
-			 etag          => $etag );
+			 {  rc            => $client->rc,
+			    last_modified => $last_modified,
+			    etag          => $etag           } );
 
     return $client;
 }
 
 sub _delete_resource {
     my $client = shift;
-    my %arg = @_;
+    my ( $args ) = @_;
 
-    my $uri = $arg{uri};
+    my $uri = $args->{uri};
 
     $client->_clear;
 
@@ -672,14 +672,14 @@ __PACKAGE__->mk_accessors( qw( resource last_modified etag ) );
 
 sub new {
     my $class = shift;
-    my %arg = @_;
+    my ( $args ) = @_;
 
-    my $rc = $arg{resource} || $arg{rc} || return;
+    my $rc = $args->{resource} || $args->{rc} || return;
 
     bless {
 	resource      => $rc,
-	last_modified => $arg{last_modified},
-	etag          => $arg{etag},
+	last_modified => $args->{last_modified},
+	etag          => $args->{etag},
     }, $class;
 }
 
@@ -1057,19 +1057,19 @@ An accessor to the resource cache.
 
 =head2 $client->_clear
 
-=head2 $client->_get_service( %args )
+=head2 $client->_get_service( $args )
 
-=head2 $client->_get_categories( %args )
+=head2 $client->_get_categories( $args )
 
-=head2 $client->_get_feed( %args )
+=head2 $client->_get_feed( $args )
 
-=head2 $client->_create_resource( %args )
+=head2 $client->_create_resource( $args )
 
-=head2 $client->_get_resource( %args )
+=head2 $client->_get_resource( $args )
 
-=head2 $client->_update_resource( %args )
+=head2 $client->_update_resource( $args )
 
-=head2 $client->_delete_resource( %args )
+=head2 $client->_delete_resource( $args )
 
 
 =head1 ERROR HANDLING

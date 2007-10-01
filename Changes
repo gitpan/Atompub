@@ -1,3 +1,11 @@
+2007-10-01  Takeru INOUE  <takeru.inoue _ gmail.com>
+
+	* release 0.2.0:
+	* Atompub/Client.pm
+	- change hash to hash reference in some internal interfaces
+	* t/02.datetime.t
+	- fix timezone bugs
+
 2007-09-29  Takeru INOUE  <takeru.inoue _ gmail.com>
 
 	* release 0.1.9:
