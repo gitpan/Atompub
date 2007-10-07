@@ -28,6 +28,7 @@ my $builder = Module::Build->new(
 	'MIME::Types' => 0,
 	'Perl6::Export::Attrs' => 0,
         'Test::Perl::Critic' => 0,
+	'Time::Local' => 0,
 	'URI::Escape' => 0,
         'XML::Atom::Service' => '0.15.4',
     },

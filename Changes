@@ -1,3 +1,9 @@
+2007-10-06  Takeru INOUE  <takeru.inoue _ gmail.com>
+
+	* release 0.2.1:
+	* Build.PL
+	- add Time::Local to requires
+
 2007-10-01  Takeru INOUE  <takeru.inoue _ gmail.com>
 
 	* release 0.2.0:
