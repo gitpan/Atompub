@@ -26,6 +26,7 @@ my $builder = Module::Build->new(
         'HTTP::Status' => 0,
         'MIME::Base64' => 0,
 	'MIME::Types' => 0,
+	'Module::Build::Compat' => 0,
 	'Perl6::Export::Attrs' => 0,
         'Test::Perl::Critic' => 0,
 	'Time::Local' => 0,
