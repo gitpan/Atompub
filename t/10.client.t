@@ -21,6 +21,10 @@ isa_ok $client, 'Atompub::Client';
 $client->username( $USER );
 $client->password( $PASS );
 
+if ( my $proxy = $ENV{HTTP_PROXY} || $ENV{http_proxy} ) {
+    diag "using HTTP proxy: $proxy";
+    $client->proxy( $proxy ) if $proxy;
+}
 
 # Service
 

@@ -1,3 +1,11 @@
+2007-11-17  Takeru INOUE  <takeru.inoue _ gmail.com>
+
+	* release 0.2.3:
+	* Atompub.pm
+	- use 5.006
+	* 10.client.t
+	- use HTTP proxy if $HTTP_PROXY/$http_proxy is defined
+
 2007-10-07  Takeru INOUE  <takeru.inoue _ gmail.com>
 
 	* release 0.2.2:
