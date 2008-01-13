@@ -10,11 +10,13 @@ BEGIN {
 }
 
 use Atompub::DateTime qw( datetime );
+use DateTime;
 use Time::Local;
 
 sub diff {
-    my $now = time;
-    my $diff = timegm( localtime( $now ) ) - timegm( gmtime( $now ) );
+    my $dt = DateTime->from_epoch(epoch => time); # in UTC
+    my $tz = Atompub::DateTime::tz();             # in local time
+    $tz->offset_for_datetime($dt);                # diff in sec.
 }
 
 sub tz {

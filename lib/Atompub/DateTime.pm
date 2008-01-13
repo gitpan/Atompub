@@ -19,7 +19,15 @@ use overload (
     fallback => 1,
 );
 
-__PACKAGE__->mk_classdata( tz  => DateTime::TimeZone->new( name => 'local' ) );
+my $tz;
+sub tz {
+    unless ($tz) {
+        eval    { $tz = DateTime::TimeZone->new(name => 'local') };
+        if ($@) { $tz = DateTime::TimeZone->new(name => 'UTC'  ) }
+    }
+    $tz;
+}
+
 __PACKAGE__->mk_classdata( fmt => DateTime::Format::W3CDTF->new );
 
 __PACKAGE__->mk_accessors( qw( dt ) );
@@ -183,7 +191,7 @@ Returns a human readable representation.
 
 An accessor for the internal L<DateTime> object.
 
-=head2 $datetime->gz
+=head2 $datetime->tz
 
 An accessor for the internal L<DateTime::TimeZone> object.
 

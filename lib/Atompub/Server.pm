@@ -186,11 +186,8 @@ For example:
         my $location = join '/', $server->uri, $id;
 	my $etag = calc_etag( $entry );
 
-        $server->response_header(
-            Location          => $location,
-           'Content-Location' => $location,
-            ETag              => $etag,
-        );
+        $server->response_header( Location => $location);
+        $server->response_header( ETag     => $etag    );
         $server->response_code( RC_CREATED );
         $server->response_content_type( 'application/atom+xml;type=entry' );
 

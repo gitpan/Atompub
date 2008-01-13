@@ -1,7 +1,10 @@
 use strict;
 use warnings;
 #use Data::Dumper; $Data::Dumper::Indent = 1;
-use Test::More tests => 84;
+use Test::More;
+
+plan skip_all => 'set ATOMPUB_TEST_LIVE to enable this test' unless $ENV{ATOMPUB_TEST_LIVE};
+plan tests => 84;
 
 use Atompub;
 use Atompub::Client;
@@ -28,19 +31,15 @@ if ( my $proxy = $ENV{HTTP_PROXY} || $ENV{http_proxy} ) {
 
 # Service
 
-SKIP: {
-    skip 'to avoid heavy access to example.com', 6 unless 0;
+ok ! $client->getService( 'http://example.com/service' ); # Not Found
 
-    ok ! $client->getService( 'http://example.com/service' ); # Not Found
+like $client->errstr, qr/not found/i;
 
-    like $client->errstr, qr/not found/i;
+isa_ok $client->req, 'HTTP::Request';
+isa_ok $client->res, 'HTTP::Response';
+ok ! $client->rc;
 
-    isa_ok $client->req, 'HTTP::Request';
-    isa_ok $client->res, 'HTTP::Response';
-    ok ! $client->rc;
-
-    is $client->res->code, RC_NOT_FOUND;
-}
+is $client->res->code, RC_NOT_FOUND;
 
 ok $client->getService( $SERVICE );
 
