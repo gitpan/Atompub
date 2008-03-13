@@ -4,98 +4,99 @@ use strict;
 use warnings;
 
 use Atompub;
-use Digest::SHA1 qw( sha1 );
-use MIME::Base64 qw( encode_base64 decode_base64 );
+use Digest::SHA1 qw(sha1);
+use MIME::Base64 qw(encode_base64 decode_base64);
 use HTTP::Status;
 use XML::Atom;
 
-use base qw( XML::Atom::Server );
+use base qw(XML::Atom::Server);
 
 sub send_http_header {
-    my $server = shift;
+    my($server) = @_;
     my $type = $server->response_content_type || 'application/atom+xml';
-    if ( $ENV{MOD_PERL} ) {
-        $server->{apache}->status( $server->response_code || RC_OK );
-        $server->{apache}->send_http_header( $type );
+    if ($ENV{MOD_PERL}) {
+        $server->{apache}->status($server->response_code || RC_OK);
+        $server->{apache}->send_http_header($type);
     }
     else {
         $server->{cgi_headers}{-status} = $server->response_code || RC_OK;
         $server->{cgi_headers}{-type} = $type;
-        print $server->{cgi}->header( %{ $server->{cgi_headers} } );
+        print $server->{cgi}->header(%{ $server->{cgi_headers} });
     }
 }
 
 sub realm {
-    my $server = shift;
-    $server->{realm} = $_[0] if @_;
+    my($server, $realm) = @_;
+    $server->{realm} = $realm if $realm;
     $server->{realm};
 }
 
 sub get_auth_info {
-    my $server = shift;
+    my($server) = @_;
     my %param;
 
-    ## Basic Authentication
-    if ( my $auth = $server->request_header( 'Authorization') ) {
+    # Basic Authentication
+    if (my $auth = $server->request_header('Authorization')) {
         return unless $auth =~ s/^\s*Basic\s+//;
         require MIME::Base64;
-	my $val = MIME::Base64::decode( $auth );
-	my ( $userid, $password ) = split /:/, $val, 2;
-	%param = ( userid => $userid, password => $password );
+	my $val = MIME::Base64::decode($auth);
+	my($userid, $password) = split /:/, $val, 2;
+	%param = (userid => $userid, password => $password);
     }
-    ## WSSE Authentication
-    elsif ( my $req = $server->request_header('X-WSSE') ) {
+    # WSSE Authentication
+    elsif (my $req = $server->request_header('X-WSSE')) {
         $req =~ s/^(?:WSSE|UsernameToken) //;
-	for my $i ( split /,\s*/, $req ) {
-            my ( $k, $v ) = split /=/, $i, 2;
+	for my $i (split /,\s*/, $req) {
+            my($k, $v) = split /=/, $i, 2;
 	    $v =~ s/^"//;
 	    $v =~ s/"$//;
 	    $param{$k} = $v;
         }
     }
     else {
-        return $server->auth_failure( RC_UNAUTHORIZED, 'Basic or WSSE authentication required' );
+        return $server->auth_failure(RC_UNAUTHORIZED, 'Basic or WSSE authentication required');
     }
 
-    return \%param;
+    \%param;
 }
 
 sub authenticate {
-    my $server = shift;
+    my($server) = @_;
+
     my $auth = $server->get_auth_info || return;
 
-    ## Basic Authentication
-    if ( defined $auth->{userid} ) {
-        my $password = $server->password_for_user( $auth->{userid} );
-	return $server->auth_failure( RC_FORBIDDEN, 'Invalid login' )
-	    if ! defined $password || $password ne $auth->{password};
+    # Basic Authentication
+    if (defined $auth->{userid}) {
+        my $password = $server->password_for_user($auth->{userid});
+	return $server->auth_failure(RC_FORBIDDEN, 'Invalid login')
+	    if !defined $password || $password ne $auth->{password};
     }
-    ## WSSE Authentication
+    # WSSE Authentication
     else {
-        for my $f ( qw( Username PasswordDigest Nonce Created ) ) {
-	    return $server->auth_failure( RC_BAD_REQUEST, "X-WSSE requires $f" )
+        for my $f (qw(Username PasswordDigest Nonce Created)) {
+	    return $server->auth_failure(RC_BAD_REQUEST, "X-WSSE requires $f")
 	        unless $auth->{$f};
 	}
-	my $password = $server->password_for_user( $auth->{Username} );
-	return $server->auth_failure( RC_FORBIDDEN, 'Invalid login' )
+	my $password = $server->password_for_user($auth->{Username});
+	return $server->auth_failure(RC_FORBIDDEN, 'Invalid login')
             unless defined $password;
 	my $expected
-            = encode_base64( sha1( decode_base64($auth->{Nonce}) . $auth->{Created} . $password ), '' );
-	return $server->auth_failure( RC_FORBIDDEN, 'Invalid login' )
+            = encode_base64(sha1(decode_base64($auth->{Nonce}).$auth->{Created}.$password), '');
+	return $server->auth_failure(RC_FORBIDDEN, 'Invalid login')
 	    unless $expected eq $auth->{PasswordDigest};
     }
 
-    return 1;
+    1;
 }
 
 sub auth_failure {
-    my $server = shift;
+    my($server) = @_;
     my $realm = $server->realm || 'Atompub';
     $server->response_header(
         'WWW-Authenticate',
         qq{Basic realm="$realm", WSSE profile="UsernameToken"},
     );
-    return $server->error( @_ );
+    $server->error(@_);
 }
 
 1;
@@ -109,13 +110,13 @@ Atompub::Server - A server for the Atom Publishing Protocol
 =head1 SYNOPSIS
 
     package My::Server;
-    use base qw( Atompub::Server );
+    use base qw(Atompub::Server);
 
     sub handle_request {
-        my $server = shift;
-        $server->authenticate || return;
+        my($server) = @_;
+        $server->authenticate or return;
         my $method = $server->request_method;
-        if ( $method eq 'POST' ) {
+        if ($method eq 'POST') {
             return $server->new_post;
         }
         ...
@@ -123,16 +124,15 @@ Atompub::Server - A server for the Atom Publishing Protocol
 
     my %Passwords;
     sub password_for_user {
-        my $server = shift;
-        my ( $username ) = @_;
+        my($server, $username) = @_;
         $Passwords{$username};
     }
 
     sub new_post {
-        my $server = shift;
-        my $entry = $server->atom_body || return;
-        ## $entry is an XML::Atom::Entry object.
-        ## ... Save the new entry ...
+        my($server) = @_;
+        my $entry = $server->atom_body or return;
+        # $entry is an XML::Atom::Entry object.
+        # ... Save the new entry ...
     }
 
     package main;
@@ -152,7 +152,7 @@ C<handle_request> method, and handle all functions such as this themselves.
 
 L<Atompub::Server> extends L<Atom::XML::Server>, and basically provides same functions.
 However, this module has been fixed based on the Atom Publishing Protocol
-described at L<http://www.ietf.org/internet-drafts/draft-ietf-atompub-protocol-17.txt>,
+described at L<http://www.ietf.org/rfc/rfc5023.txt>,
 and supports Basic authentication rather than WSSE.
 
 
@@ -163,36 +163,36 @@ and supports Basic authentication rather than WSSE.
 Subclasses of L<Atompub::Server> must override the C<handle_request>
 method to perform all request processing.
 The implementation must set all response headers, including the response
-code and any relevant HTTP headers, and should return a scalar representing 
+code and any relevant HTTP headers, and should return a scalar representing
 the response body to be sent back to the client.
 
 For example:
 
     sub handle_request {
-        my $server = shift;
+        my($server) = @_;
         my $method = $server->request_method;
-        if ( $method eq 'POST' ) {
+        if ($method eq 'POST') {
             return $server->new_post;
         }
-        ## ... handle GET, PUT, etc
+        # ... handle GET, PUT, etc
     }
 
     sub new_post {
-        my $server = shift;
-        my $entry = $server->atom_body || return;
+        my($server) = @_;
+        my $entry = $server->atom_body or return;
 
-        ## Implementation-specific
-        my $id = save_this_entry( $entry );
+        # Implementation-specific
+        my $id = save_this_entry($entry);
         my $location = join '/', $server->uri, $id;
-	my $etag = calc_etag( $entry );
+	my $etag = calc_etag($entry);
 
-        $server->response_header( Location => $location);
-        $server->response_header( ETag     => $etag    );
-        $server->response_code( RC_CREATED );
-        $server->response_content_type( 'application/atom+xml;type=entry' );
+        $server->response_header(Location => $location);
+        $server->response_header(ETag     => $etag    );
+        $server->response_code(RC_CREATED);
+        $server->response_content_type('application/atom+xml;type=entry');
 
-	## Implementation-specific
-        return serialize_entry( $entry );
+	# Implementation-specific
+        return serialize_entry($entry);
     }
 
 =head2 Authentication
@@ -205,10 +205,9 @@ just return C<undef>.
 
 For example:
 
-    my %Passwords = ( foo => 'bar' );   ## The password for "foo" is "bar".
+    my %Passwords = (foo => 'bar');   # The password for "foo" is "bar".
     sub password_for_user {
-        my $server = shift;
-        my ( $username ) = @_;
+        my($server, $username) = @_;
         $Passwords{$username};
     }
 
@@ -245,13 +244,13 @@ If called with an argument, sets the I<realm> for Basic authentication.
 
 Returns the current I<realm> that will be used when receiving requests.
 
-=head2 $server->send_http_header( $content_type )
+=head2 $server->send_http_header($content_type)
 
 =head2 $server->get_auth_info
 
 =head2 $server->authenticate
 
-=head2 $server->auth_failure( $status, $message )
+=head2 $server->auth_failure($status, $message)
 
 =head2 oether methods
 

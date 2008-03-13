@@ -7,14 +7,16 @@ use Atompub;
 use MIME::Types;
 use Perl6::Export::Attrs;
 
-use base qw( Class::Accessor::Fast );
+use base qw(Class::Accessor::Fast);
 
-my %ATOM_TYPE = ( entry      => 'application/atom+xml;type=entry',
-		  feed       => 'application/atom+xml;type=feed',
-		  service    => 'application/atomsvc+xml',
-		  categories => 'application/atomcat+xml' );
+my %ATOM_TYPE = (
+    entry      => 'application/atom+xml;type=entry',
+    feed       => 'application/atom+xml;type=feed',
+    service    => 'application/atomsvc+xml',
+    categories => 'application/atomcat+xml',
+);
 
-__PACKAGE__->mk_accessors( qw( type subtype parameters ) );
+__PACKAGE__->mk_accessors(qw(type subtype parameters));
 
 use overload (
     q{""}    => \&as_string,
@@ -24,11 +26,9 @@ use overload (
 );
 
 sub new {
-    my $class = shift;
-    my $media_type = $ATOM_TYPE{ $_[0] } || $_[0] || return;
-
-    my ( $type, $subtype, $param ) = split m{[/;]}, $media_type;
-
+    my($class, $arg) = @_;
+    my $media_type = $ATOM_TYPE{$arg} || $arg or return;
+    my($type, $subtype, $param) = split m{[/;]}, $media_type;
     bless {
 	type       => $type,
 	subtype    => $subtype,
@@ -36,60 +36,51 @@ sub new {
     }, $class;
 }
 
-sub media_type :Export { __PACKAGE__->new( @_ ) }
+sub media_type :Export { __PACKAGE__->new(@_) }
 
 sub subtype_major {
-    my $self = shift;
-    return $self->subtype =~ /\+(.+)/ ? $1 : $self->subtype;
+    my($self) = @_;
+    $self->subtype =~ /\+(.+)/ ? $1 : $self->subtype;
 }
 
 sub without_parameters {
-    my $self = shift;
-    return join '/', $self->type, $self->subtype;
+    my($self) = @_;
+    join '/', $self->type, $self->subtype;
 }
 
 sub as_string {
-    my $self = shift;
-    return join ';', grep { defined $_ } $self->without_parameters, $self->parameters;
+    my($self) = @_;
+    join ';', grep { defined $_ } $self->without_parameters, $self->parameters;
 }
 
 sub extensions {
-    my $self = shift;
-    my $mime = MIME::Types->new->type( $self->without_parameters ) || return;
+    my($self) = @_;
+    my $mime = MIME::Types->new->type($self->without_parameters) or return;
     my @exts = $mime->extensions;
-    return wantarray ? @exts : $exts[0];
+    wantarray ? @exts : $exts[0];
 }
 
 sub extension { scalar shift->extensions }
 
 sub is_a {
-    my $self = shift;
-    my ( $test ) = @_;
-
-    $test = __PACKAGE__->new( $test )
-	unless UNIVERSAL::isa( $test, __PACKAGE__ );
-
+    my($self, $test) = @_;
+    $test = __PACKAGE__->new($test) unless UNIVERSAL::isa($test, __PACKAGE__);
     return 1 if $test->type eq '*';
-
     return 0 unless $test->type eq $self->type;
-
     return 1 if $test->subtype eq '*';
-
-    if ( $test->subtype eq $test->subtype_major ) { ## ex. application/xml
+    if ($test->subtype eq $test->subtype_major) { # ex. application/xml
 	return 0 unless $test->subtype_major eq $self->subtype_major;
     }
-    else { ## ex. application/atom+xml
+    else { # ex. application/atom+xml
 	return 0 unless $test->subtype eq $self->subtype;
     }
-
     return 1 if ! $test->parameters || ! $self->parameters;
-
     return $test->parameters eq $self->parameters;
 }
 
 sub is_not_a {
-    my $self = shift;
-    return ! $self->is_a( @_ );
+    my($self, @args) = @_;
+    !$self->is_a(@args);
 }
 
 1;
@@ -101,7 +92,7 @@ Atompub::MediaType - a media type object for the Atom Publishing Protocol
 
 =head1 SYNOPSIS
 
-    use Atompub::MediaType qw( media_type );
+    use Atompub::MediaType qw(media_type);
 
     my $type = media_type('image/png');
 

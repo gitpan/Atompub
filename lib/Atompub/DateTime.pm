@@ -7,11 +7,11 @@ use Atompub;
 use DateTime;
 use DateTime::Format::W3CDTF;
 use DateTime::TimeZone;
-use HTTP::Date qw( str2time time2isoz time2str );
+use HTTP::Date qw(str2time time2isoz time2str);
 use Perl6::Export::Attrs;
 use Time::Local;
 
-use base qw( Class::Accessor::Fast Class::Data::Inheritable );
+use base qw(Class::Accessor::Fast Class::Data::Inheritable);
 
 use overload (
     q{""}    => \&w3c,
@@ -28,33 +28,32 @@ sub tz {
     $tz;
 }
 
-__PACKAGE__->mk_classdata( fmt => DateTime::Format::W3CDTF->new );
-
-__PACKAGE__->mk_accessors( qw( dt ) );
+__PACKAGE__->mk_classdata(fmt => DateTime::Format::W3CDTF->new);
+__PACKAGE__->mk_accessors(qw(dt));
 
 sub new {
-    my $class = shift;
+    my($class, @args) = @_;
     my $self = bless {}, $class;
-    $self->init( @_ ) || return;
+    $self->init(@args) or return;
     $self;
 }
 
 sub init {
-    my $self = shift;
-    my ( $arg ) = @_;
+    my($self, $arg) = @_;
 
-    my $epoch = ! $arg                          ? time
-	      : UNIVERSAL::can( $arg, 'epoch' ) ? $arg->epoch
-	      : $arg =~ qr{^\d{1,13}$}          ? $arg
-              : $arg =~ qr{^\d{14}$}            ? _parse_timestamp( $arg )
-	      :                                   str2time $arg;
+    my $epoch = !$arg                         ? time
+	      : UNIVERSAL::can($arg, 'epoch') ? $arg->epoch
+	      : $arg =~ qr{^\d{1,13}$}        ? $arg
+              : $arg =~ qr{^\d{14}$}          ? _parse_timestamp($arg)
+	      :                                 str2time $arg;
 
     return unless defined $epoch;
 
-    my $dt = DateTime->from_epoch( epoch     => $epoch,
-				   time_zone => $self->tz,
-				   formatter => $self->fmt, );
-    $self->dt( $dt );
+    $self->dt(DateTime->from_epoch(
+        epoch     => $epoch,
+        time_zone => $self->tz,
+        formatter => $self->fmt,
+    ));
 
     $self;
 }
@@ -70,23 +69,23 @@ sub _parse_timestamp {
 sub epoch { $_[0]->dt->epoch }
 
 sub iso {
-    my $self = shift;
+    my($self) = @_;
     $self->{iso} ||= sprintf '%s %s', $self->dt->ymd, $self->dt->hms;
 }
 
 sub isoz {
-    my $self = shift;
+    my($self) = @_;
     $self->{isoz} ||= time2isoz $self->epoch;
 }
-    
+
 sub w3c {
-    my $self = shift;
+    my($self) = @_;
     $self->{w3c} ||= '' . $self->dt;
 }
 
 sub w3cz {
-    my $self = shift;
-    if ( ! $self->{w3cz} ) {
+    my($self) = @_;
+    unless ($self->{w3cz}) {
 	my $w3cz = time2isoz $self->epoch;
 	$w3cz =~ s/ /T/;
 	$self->{w3cz} = $w3cz;
@@ -95,7 +94,7 @@ sub w3cz {
 }
 
 sub str {
-    my $self = shift;
+    my($self) = @_;
     $self->{str} ||= time2str $self->epoch;
 }
 
@@ -111,10 +110,10 @@ Atompub::DateTime - A date and time object for the Atom Publishing Protocol
 
     # assuming the local timezone is JST (+09:00)
 
-    use Atompub::DateTime qw( datetime );
+    use Atompub::DateTime qw(datetime);
 
     $dt = datetime;                                  # current time
-    $dt = datetime( DateTime->new );
+    $dt = datetime(DateTime->new);
     $dt = datetime(1167609600);                      # UTC epoch value
     $dt = datetime('20070101090000');
     $dt = datetime('2007-01-01 09:00:00');
@@ -130,7 +129,7 @@ Atompub::DateTime - A date and time object for the Atom Publishing Protocol
     $dt->w3cz;  # 2007-01-01T00:00:00Z
     $dt->str;   # Mon, 01 Jan 2007 00:00:00 GMT
 
-    my $dt2 = datetime( $dt ); # copy
+    my $dt2 = datetime($dt); # copy
 
     $dt == $dt2; # compare
 
@@ -169,7 +168,7 @@ Returns a "YYYY-MM-DD hh:mm:ssZ"-formatted string representing Universal Time.
 
 =head2 $datetime->w3c
 
-Returns a "YYYY-MM-DDThh:mm:ssTZ"-formatted string (W3C DateTime Format) 
+Returns a "YYYY-MM-DDThh:mm:ssTZ"-formatted string (W3C DateTime Format)
 representing time in the local time zone.
 
     2007-01-01T09:00:00+09:00

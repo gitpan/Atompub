@@ -5,11 +5,11 @@ use Test::More tests => 11;
 
 # current time is "Mon Jan 01 10:00:00 2007" in your timezone
 BEGIN {
-    use HTTP::Date qw( str2time );
+    use HTTP::Date qw(str2time);
     *CORE::GLOBAL::time = sub { str2time '2007-01-01 10:00:00' };
 }
 
-use Atompub::DateTime qw( datetime );
+use Atompub::DateTime qw(datetime);
 use DateTime;
 use Time::Local;
 
@@ -38,11 +38,11 @@ like $dt->str,  qr{^[a-z]{3},\s+\d{1,2}\s+[a-z]{3}\s+20\d\d\s+\d\d:\d\d:\d\d\s+G
 is "$dt", $dt->w3c;
 is 0+$dt, $dt->epoch;
 
-my $dt2 = datetime( $dt );
+my $dt2 = datetime($dt);
 
 ok $dt = $dt2;
 
-$dt2 = datetime( $dt->epoch + 1 );
+$dt2 = datetime($dt->epoch + 1);
 
 ok $dt  < $dt2;
 ok $dt != $dt2;

@@ -4,7 +4,7 @@ use warnings;
 use strict;
 
 use 5.006;
-use version; our $VERSION = qv('0.2.4');
+use version; our $VERSION = qv('0.3.0');
 
 use HTTP::Headers;
 use HTTP::Request;
@@ -12,50 +12,49 @@ use HTTP::Response;
 use XML::Atom;
 use XML::Atom::Service 0.15.4;
 
-our %REQUEST_HEADERS  = ( accept              => 'Accept',
-			  if_match            => 'If-Match',
-			  if_none_match       => 'If-None-Match',
-			  if_modified_since   => 'If-Modified-Since',
-			  if_unmodified_since => 'If-Unmodified-Since', );
+our %REQUEST_HEADERS = (
+    accept              => 'Accept',
+    if_match            => 'If-Match',
+    if_none_match       => 'If-None-Match',
+    if_modified_since   => 'If-Modified-Since',
+    if_unmodified_since => 'If-Unmodified-Since',
+);
 
-our %RESPONSE_HEADERS = ( content_location    => 'Content-Location',
-			  etag                => 'ETag',
-			  location            => 'Location', );
+our %RESPONSE_HEADERS = (
+    content_location => 'Content-Location',
+    etag             => 'ETag',
+    location         => 'Location',
+);
 
-our %ENTITY_HEADERS   = ( last_modified       => 'Last-Modified',
-			  slug                => 'Slug', );
+our %ENTITY_HEADERS = (
+    last_modified => 'Last-Modified',
+    slug          => 'Slug',
+);
 
-while ( my ( $method, $header ) = each %REQUEST_HEADERS ) {
+while (my($method, $header) = each %REQUEST_HEADERS) {
     no strict 'refs'; ## no critic
-    if ( ! HTTP::Headers->can( $method ) ) {
-	*{ "HTTP::Headers::$method" } = sub { shift->header( $header, @_ ) };
-    }
-    if ( ! HTTP::Request->can( $method ) ) {
-	*{ "HTTP::Request::$method" } = sub { shift->header( $header, @_ ) };
-    }
+    *{"HTTP::Headers::$method"} = sub { shift->header($header, @_) }
+        unless HTTP::Headers->can($method);
+    *{"HTTP::Request::$method"} = sub { shift->header($header, @_)}
+        unless (HTTP::Request->can($method));
 }
 
-while ( my ( $method, $header ) = each %RESPONSE_HEADERS ) {
+while (my($method, $header) = each %RESPONSE_HEADERS) {
     no strict 'refs'; ## no critic
-    if ( ! HTTP::Headers->can( $method ) ) {
-	*{ "HTTP::Headers::$method" } = sub { shift->header( $header, @_ ) };
-    }
-    if ( ! HTTP::Response->can( $method ) ) {
-	*{ "HTTP::Response::$method" } = sub { shift->header( $header, @_ ) };
-    }
+    *{"HTTP::Headers::$method"} = sub { shift->header($header, @_) }
+        unless HTTP::Headers->can($method);
+    *{"HTTP::Response::$method"} = sub { shift->header($header, @_) }
+        unless HTTP::Response->can($method);
 }
 
-while ( my ( $method, $header ) = each %ENTITY_HEADERS ) {
+while (my($method, $header) = each %ENTITY_HEADERS) {
     no strict 'refs'; ## no critic
-    if ( ! HTTP::Headers->can( $method ) ) {
-	*{ "HTTP::Headers::$method" } = sub { shift->header( $header, @_ ) };
-    }
-    if ( ! HTTP::Request->can( $method ) ) {
-	*{ "HTTP::Request::$method" } = sub { shift->header( $header, @_ ) };
-    }
-    if ( ! HTTP::Response->can( $method ) ) {
-	*{ "HTTP::Response::$method" } = sub { shift->header( $header, @_ ) };
-    }
+    *{"HTTP::Headers::$method"} = sub { shift->header($header, @_) }
+        unless HTTP::Headers->can($method);
+    *{"HTTP::Request::$method"} = sub { shift->header($header, @_) }
+        unless HTTP::Request->can($method);
+    *{"HTTP::Response::$method"} = sub { shift->header($header, @_) }
+        unless HTTP::Response->can($method);
 }
 
 1; # Magic true value required at end of module
@@ -68,23 +67,23 @@ Atompub - Atom Publishing Protocol implementation
 
 =head1 DESCRIPTION
 
-The Atom Publishing Protocol (Atompub) is a protocol for publishing and 
-editing Web resources described at
-L<http://www.ietf.org/internet-drafts/draft-ietf-atompub-protocol-17.txt>.
+The Atom Publishing Protocol (Atompub) is a protocol for publishing and
+editing Web resources described at L<http://www.ietf.org/rfc/rfc5023.txt>.
 
 L<Atompub> implements client L<Atompub::Client> and server L<Atompub::Server> for the protocol.
-XML formats used in the protocol are implemented in L<XML::Atom> and 
+XML formats used in the protocol are implemented in L<XML::Atom> and
 L<XML::Atom::Service>.
 Catalyst extension L<Catalyst::Controller::Atompub> is also available.
 
-This module was tested in InteropTokyo2007
-L<http://intertwingly.net/wiki/pie/July2007InteropTokyo>, 
+This module was tested in July2007InteropTokyo and November2007Interop,
 and interoperated with other implementations.
+See L<http://intertwingly.net/wiki/pie/July2007InteropTokyo> and
+L<http://www.intertwingly.net/wiki/pie/November2007Interop> in detail.
 
 
 =head1 METHODS of HTTP::Headers, HTTP::Request, and HTTP::Response
 
-Some accessors for the HTTP header fields, which are used in the Atom Publishing Protocol, 
+Some accessors for the HTTP header fields, which are used in the Atom Publishing Protocol,
 are imported into L<HTTP::Headers>, L<HTTP::Request>, and L<HTTP::Response>.
 See L<http://www.ietf.org/rfc/rfc2616.txt> in detail.
 

@@ -3,7 +3,7 @@ use warnings;
 #use Data::Dumper; $Data::Dumper::Indent = 1;
 use Test::More tests => 37;
 
-use Atompub::MediaType qw( media_type );
+use Atompub::MediaType qw(media_type);
 
 my $png = media_type('image/png');
 isa_ok $png, 'Atompub::MediaType';

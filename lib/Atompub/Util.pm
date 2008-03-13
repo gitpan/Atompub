@@ -4,23 +4,23 @@ use warnings;
 use strict;
 
 use Atompub;
-use Atompub::MediaType qw( media_type );
+use Atompub::MediaType qw(media_type);
 use Perl6::Export::Attrs;
 use XML::Atom::Category;
 
 sub is_acceptable_media_type :Export {
-    my ( $coll, $content_type ) = @_;
+    my($coll, $content_type) = @_;
 
     return 1 unless $coll;
 
     my @accepts = map { split /[\s,]+/ } $coll->accept;
-    @accepts = ( media_type('entry') ) unless @accepts; ## assign default type
+    @accepts = (media_type('entry')) unless @accepts; # assign default type
 
-    return grep { media_type( $content_type )->is_a($_) } @accepts;
+    grep { media_type($content_type)->is_a($_) } @accepts;
 }
 
 sub is_allowed_category :Export {
-    my ( $coll, @tests ) = @_;
+    my($coll, @tests) = @_;
 
     return 1 unless $coll;
     return 1 unless $coll->categories;
@@ -28,28 +28,28 @@ sub is_allowed_category :Export {
     return 1 if grep { ! $_->fixed || $_->fixed ne 'yes' } $coll->categories;
 
     my @allowed;
-    for my $cats ( $coll->categories ) {
+    for my $cats ($coll->categories) {
 	push @allowed, map { my $cat = XML::Atom::Category->new;
 			     my $scheme = $_->scheme || $cats->scheme;
-			     $cat->term( $_->term );
-			     $cat->scheme( $scheme ) if $scheme;
+			     $cat->term($_->term);
+			     $cat->scheme($scheme) if $scheme;
 			     $cat }
 	                   $cats->category;
     }
 
     return 0 if ! @allowed && @tests;
 
-    for my $t ( @tests ) {
-	return 0 unless grep { _match_category( $_, $t ) } @allowed;
+    for my $t (@tests) {
+	return 0 unless grep { _match_category($_, $t) } @allowed;
     }
 
-    return 1;
+    1;
 }
 
 sub _match_category {
-    my ( $allowed, $test ) = @_;
+    my($allowed, $test) = @_;
     return $allowed->term eq $test->term
-	&& ( ! $allowed->scheme || $test->scheme && $allowed->scheme eq $test->scheme );
+	&& (!$allowed->scheme || $test->scheme && $allowed->scheme eq $test->scheme);
 }
 
 1;
@@ -61,9 +61,9 @@ Atompub::Util - Utility functions
 
 =head1 FUNCTIONS
 
-=head2 is_acceptable_media_type( $collection, $content_type )
+=head2 is_acceptable_media_type($collection, $content_type)
 
-=head2 is_allowed_category( $collection, $category, ... )
+=head2 is_allowed_category($collection, $category, ...)
 
 =head1 INTERNAL INTERFACES
 

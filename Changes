@@ -1,8 +1,18 @@
+2008-03-13  Takeru INOUE  <takeru.inoue _ gmail.com>
+
+	* release 0.3.0:
+	* lib/Atompub/Client.pm
+	- use Class::Accessor::Fast instead of Class::Accessor::Lvalue::Fast,
+	  since lvalue module doesn't work with the debugger.
+	  Thanks to Loach
+	* all perl codes
+	- change coding conventions
+
 2008-01-13  Takeru INOUE  <takeru.inoue _ gmail.com>
 
 	* release 0.2.4:
 	* lib/Atompub/Server.pm
-	- fix POD, thanks Thorsten
+	- fix POD. Thanks to Thorsten
 	* lib/Atompub/DateTime.pm, t/02.datetime.t
 	- catch exceptions in creating timezone object
 	* t/10.client.t

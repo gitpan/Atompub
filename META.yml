@@ -1,6 +1,6 @@
 ---
 name: Atompub
-version: 0.2.4
+version: 0.3.0
 author:
   - 'Takeru INOUE <takeru.inoue _ gmail.com>'
 abstract: Atom Publishing Protocol implementation
@@ -9,7 +9,6 @@ resources:
   license: http://dev.perl.org/licenses/
 requires:
   Class::Accessor::Fast: 0
-  Class::Accessor::Lvalue::Fast: 0
   Class::Data::Inheritable: 0
   DateTime: 0
   DateTime::Format::W3CDTF: 0
@@ -34,7 +33,7 @@ requires:
 provides:
   Atompub:
     file: lib/Atompub.pm
-    version: 0.2.4
+    version: 0.3.0
   Atompub::Client:
     file: lib/Atompub/Client.pm
   Atompub::Client::Cache:
