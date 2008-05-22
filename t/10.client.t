@@ -12,8 +12,8 @@ use Atompub::DateTime qw(datetime);
 use HTTP::Status;
 use URI::Escape;
 
-my $SERVICE = 'http://teahut.sakura.ne.jp:3000/service';
-#my $SERVICE = 'http://localhost:3000/service';
+#my $SERVICE = 'http://teahut.sakura.ne.jp:3000/service';
+my $SERVICE = 'http://localhost:3000/service';
 my $USER = 'foo';
 my $PASS = 'foo';
 
@@ -89,7 +89,7 @@ isa_ok $client->req, 'HTTP::Request';
 isa_ok $client->res, 'HTTP::Response';
 isa_ok $client->rc, 'XML::Atom::Entry';
 
-is $client->req->slug, uri_escape('Entry 1');
+is $client->req->slug, 'Entry 1';
 is $client->res->code, RC_CREATED;
 ok my $uri = $client->res->location;
 
@@ -173,7 +173,7 @@ isa_ok $client->req, 'HTTP::Request';
 isa_ok $client->res, 'HTTP::Response';
 isa_ok $client->rc, 'XML::Atom::Entry';
 
-is $client->req->slug, uri_escape('Media 1');
+is $client->req->slug, 'Media 1';
 is $client->res->code, RC_CREATED;
 ok $uri = $client->res->location;
 

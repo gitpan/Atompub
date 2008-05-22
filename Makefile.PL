@@ -1,5 +1,38 @@
-use lib qw(lib);
-use Module::Build::Compat;
+use strict;
+use warnings;
+use inc::Module::Install;
 
-Module::Build::Compat->run_build_pl(args => \@ARGV);
-Module::Build::Compat->write_makefile(build_class => 'Module::Build');
+name('Atompub');
+all_from('lib/Atompub.pm');
+license('perl');
+
+requires('Class::Accessor::Fast');
+requires('Class::Data::Inheritable');
+requires('DateTime');
+requires('DateTime::Format::W3CDTF');
+requires('DateTime::TimeZone');
+requires('Digest::SHA1');
+requires('File::Slurp');
+requires('HTTP::Date');
+requires('HTTP::Headers');
+requires('HTTP::Request');
+requires('HTTP::Response');
+requires('HTTP::Status');
+requires('MIME::Base64');
+requires('MIME::Types');
+requires('Module::Build::Compat');
+requires('Perl6::Export::Attrs');
+requires('Test::Perl::Critic');
+requires('Time::Local');
+requires('URI::Escape');
+requires('XML::Atom::Service', 0.016);
+
+requires('version');
+
+build_requires('Test::More');
+build_requires('Test::Perl::Critic');
+
+auto_include;
+auto_install;
+
+WriteAll;

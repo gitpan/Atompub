@@ -1,3 +1,12 @@
+2008-05-22  Takeru INOUE  <takeru.inoue _ gmail.com>
+
+	* release 0.3.1:
+        * Makefile.PL
+        - use Module::Install
+	* lib/Atompub/Client.pm
+	- fix slug encoding scheme.
+	  Thanks to Vincent
+
 2008-03-13  Takeru INOUE  <takeru.inoue _ gmail.com>
 
 	* release 0.3.0:

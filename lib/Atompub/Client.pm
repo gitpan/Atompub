@@ -70,7 +70,7 @@ sub createEntry {
     }
     my $headers = HTTP::Headers->new;
     $headers->content_type(media_type('entry'));
-    $headers->slug(uri_escape uri_unescape $slug) if defined $slug;
+    $headers->slug(_escape(uri_unescape $slug)) if defined $slug;
     $client->_create_resource({
         uri     => $uri,
         rc      => $entry,
@@ -88,7 +88,7 @@ sub createMedia {
         or return $client->error('No media');
     my $headers = HTTP::Headers->new;
     $headers->content_type($content_type);
-    $headers->slug(uri_escape uri_unescape $slug) if defined $slug;
+    $headers->slug(_escape( uri_unescape $slug)) if defined $slug;
     $client->_create_resource({
         uri     => $uri,
         rc      => \$media,
@@ -440,6 +440,11 @@ sub munge_request {
 
     $req->header('X-WSSE' => $wsse);
     $req->authorization('WSSE profile="UsernameToken"');
+}
+
+# see 9.7.1 in RFC 5023
+sub _escape {
+    uri_escape(uri_escape(uri_escape(shift, "\x00-\x19"), "\x25-\x25"), "\x7e-\xff");
 }
 
 package Atompub::Client::Info;
