@@ -4,7 +4,7 @@ use warnings;
 use strict;
 
 use 5.006;
-use version; our $VERSION = qv('0.3.1');
+use version 0.74; our $VERSION = qv('0.3.2');
 
 use HTTP::Headers;
 use HTTP::Request;
@@ -158,7 +158,7 @@ Takeru INOUE, E<lt>takeru.inoue _ gmail.comE<gt>
 
 =head1 LICENCE AND COPYRIGHT
 
-Copyright (c) 2007, Takeru INOUE C<< <takeru.inoue _ gmail.com> >>. All rights reserved.
+Copyright (c) 2007, Takeru INOUE C<< <takeru.inoue _ gmail.com> >>.
 
 This module is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself. See L<perlartistic>.

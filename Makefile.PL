@@ -27,7 +27,7 @@ requires('Time::Local');
 requires('URI::Escape');
 requires('XML::Atom::Service', 0.016);
 
-requires('version');
+requires('version', 0.74);
 
 build_requires('Test::More');
 build_requires('Test::Perl::Critic');

@@ -1,7 +1,11 @@
 use strict;
 use warnings;
 #use Data::Dumper; $Data::Dumper::Indent = 1;
-use Test::More tests => 11;
+use Test::More;
+
+plan skip_all => 'set ATOMPUB_TEST_LIVE to enable this test'
+    unless $ENV{ATOMPUB_TEST_LIVE};
+plan tests => 11;
 
 # current time is "Mon Jan 01 10:00:00 2007" in your timezone
 BEGIN {
