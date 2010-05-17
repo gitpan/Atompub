@@ -8,6 +8,7 @@ use Atompub::DateTime qw(datetime);
 use Atompub::MediaType qw(media_type);
 use Atompub::Util qw(is_acceptable_media_type is_allowed_category);
 use Digest::SHA1 qw(sha1);
+use Encode qw(encode_utf8);
 use File::Slurp;
 use HTTP::Status;
 use MIME::Base64 qw(encode_base64);
@@ -26,7 +27,7 @@ __PACKAGE__->mk_accessors(@ATTRS, qw(ua info cache));
 *rc  = \&resource;
 
 sub init {
-    my($client) = @_;
+    my $client = shift;
     $client->NEXT::init(@_);
     $client->ua->agent('Atompub::Client/'.Atompub->VERSION);
     $client->info(Atompub::Client::Info->instance);
@@ -444,7 +445,8 @@ sub munge_request {
 
 # see 9.7.1 in RFC 5023
 sub _escape {
-    uri_escape(uri_escape(uri_escape(shift, "\x00-\x19"), "\x25-\x25"), "\x7e-\xff");
+    my ($slug) = @_;
+    return uri_escape(encode_utf8($slug), "\x00-\x19\x25-\x25\x7e-\xff");
 }
 
 package Atompub::Client::Info;

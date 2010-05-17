@@ -4,7 +4,7 @@ use warnings;
 use strict;
 
 use 5.006;
-use version 0.74; our $VERSION = qv('0.3.2');
+use version 0.74; our $VERSION = qv('0.3.3');
 
 use HTTP::Headers;
 use HTTP::Request;
