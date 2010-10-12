@@ -150,7 +150,7 @@ such as creating an entry, retrieving a list of entries, deleting an entry, etc.
 Implementations should subclass L<Atompub::Server>, overriding the
 C<handle_request> method, and handle all functions such as this themselves.
 
-L<Atompub::Server> extends L<Atom::XML::Server>, and basically provides same functions.
+L<Atompub::Server> extends L<XML::Atom::Server>, and basically provides same functions.
 However, this module has been fixed based on the Atom Publishing Protocol
 described at L<http://www.ietf.org/rfc/rfc5023.txt>,
 and supports Basic authentication rather than WSSE.

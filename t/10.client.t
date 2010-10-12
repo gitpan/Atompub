@@ -12,8 +12,8 @@ use Atompub::DateTime qw(datetime);
 use HTTP::Status;
 use URI::Escape;
 
-#my $SERVICE = 'http://teahut.sakura.ne.jp:3000/service';
-my $SERVICE = 'http://localhost:3000/service';
+my $SERVICE = 'http://teahut.sakura.ne.jp:3000/service';
+#my $SERVICE = 'http://localhost:3000/service';
 my $USER = 'foo';
 my $PASS = 'foo';
 
