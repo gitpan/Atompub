@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use Atompub;
-use Digest::SHA1 qw(sha1);
+use Digest::SHA qw(sha1);
 use MIME::Base64 qw(encode_base64 decode_base64);
 use HTTP::Status;
 use XML::Atom;

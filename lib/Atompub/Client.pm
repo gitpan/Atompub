@@ -7,7 +7,7 @@ use Atompub;
 use Atompub::DateTime qw(datetime);
 use Atompub::MediaType qw(media_type);
 use Atompub::Util qw(is_acceptable_media_type is_allowed_category);
-use Digest::SHA1 qw(sha1);
+use Digest::SHA qw(sha1);
 use Encode qw(encode_utf8);
 use File::Slurp;
 use HTTP::Status;

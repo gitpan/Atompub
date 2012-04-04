@@ -11,7 +11,7 @@ requires('Class::Data::Inheritable');
 requires('DateTime');
 requires('DateTime::Format::W3CDTF');
 requires('DateTime::TimeZone');
-requires('Digest::SHA1');
+requires('Digest::SHA');
 requires('File::Slurp');
 requires('HTTP::Date');
 requires('HTTP::Headers');
