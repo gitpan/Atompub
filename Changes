@@ -1,3 +1,9 @@
+2012-04-06  Takeru INOUE  <takeru.inoue _ gmail.com>
+
+	* release 0.3.7:
+	* Makefile.PL
+	- remove auto_include(_deps)
+
 2012-04-05  Takeru INOUE  <takeru.inoue _ gmail.com>
 
 	* release 0.3.6:

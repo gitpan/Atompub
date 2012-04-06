@@ -32,7 +32,7 @@ requires('version', 0.74);
 build_requires('Test::More');
 build_requires('Test::Perl::Critic');
 
-auto_include_deps;
+#auto_include;
 auto_install;
 
 WriteAll;
